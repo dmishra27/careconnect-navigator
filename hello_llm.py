@@ -1,8 +1,13 @@
 import mlflow
+from databricks.sdk import WorkspaceClient
 from databricks_openai import DatabricksOpenAI
 
 mlflow.set_tracking_uri("databricks")
-mlflow.set_experiment("/Users/dmishra27@outlook.com/careconnect-dev")
+
+# Build the experiment path from the logged-in user, so no email is hard-coded
+me = WorkspaceClient().current_user.me().user_name
+mlflow.set_experiment(f"/Users/{me}/careconnect-dev")
+
 mlflow.openai.autolog()  # traces every OpenAI-compatible call
 
 client = DatabricksOpenAI()  # uses your DEFAULT profile
