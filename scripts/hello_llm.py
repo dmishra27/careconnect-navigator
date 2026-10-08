@@ -2,7 +2,11 @@ from pathlib import Path
 
 import mlflow
 from databricks.sdk import WorkspaceClient
-from databricks_openai import DatabricksOpenAI
+
+try:
+    from databricks_openai import DatabricksOpenAI  # newer databricks-openai
+except ImportError:  # older version shipped in serverless environment 5
+    DatabricksOpenAI = None
 
 from careconnect.config import ProjectConfig
 
@@ -10,11 +14,16 @@ ROOT = Path(__file__).resolve().parents[1]
 cfg = ProjectConfig.from_yaml(ROOT / "project_config.yml", env="dev")
 
 mlflow.set_tracking_uri("databricks")
-me = WorkspaceClient().current_user.me().user_name
+w = WorkspaceClient()
+me = w.current_user.me().user_name
 mlflow.set_experiment(f"/Users/{me}/{cfg.experiment_name}")
 mlflow.openai.autolog()
 
-client = DatabricksOpenAI()
+if DatabricksOpenAI is not None:
+    client = DatabricksOpenAI()
+else:
+    client = w.serving_endpoints.get_open_ai_client()
+
 resp = client.chat.completions.create(
     model=cfg.llm_endpoint,
     messages=[
