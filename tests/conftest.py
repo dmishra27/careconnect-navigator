@@ -1,21 +1,28 @@
-"""This file configures pytest, initializes Databricks Connect, and provides fixtures for Spark and loading test data."""
+"""Configure pytest, initialise Databricks Connect and provide fixtures.
 
-import os, sys, pathlib
+Provides fixtures for Spark and for loading test data.
+"""
+
+import os
+import pathlib
+import sys
 from contextlib import contextmanager
 
-
 try:
+    import csv
+    import json
+    import os
+
+    import pytest
     from databricks.connect import DatabricksSession
     from databricks.sdk import WorkspaceClient
     from pyspark.sql import SparkSession
-    import pytest
-    import json
-    import csv
-    import os
+
 except ImportError:
     raise ImportError(
-        "Test dependencies not found.\n\nRun tests using 'uv run pytest'. See http://docs.astral.sh/uv to learn more about uv."
-    )
+        "Test dependencies not found.\n\n"
+        "Run tests using 'uv run pytest'. See http://docs.astral.sh/uv to learn more about uv."
+    ) from None
 
 
 @pytest.fixture()

@@ -1,0 +1,15 @@
+dev:
+  catalog: workspace
+  schema_name: dmishra27
+  experiment_name: careconnect-dev
+  llm_endpoint: databricks-meta-llama-3-3-70b-instruct
+  judge_endpoint: databricks-meta-llama-3-1-8b-instruct
+  embedding_endpoint: databricks-gte-large-en
+
+prod:
+  catalog: workspace
+  schema_name: careconnect_prod
+  experiment_name: careconnect-prod
+  llm_endpoint: databricks-meta-llama-3-3-70b-instruct
+  judge_endpoint: databricks-meta-llama-3-1-8b-instruct
+  embedding_endpoint: databricks-gte-large-en
