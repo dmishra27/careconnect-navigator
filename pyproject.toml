@@ -34,6 +34,7 @@ packages = ["src/careconnect"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+builtins = ["spark", "dbutils", "display", "displayHTML"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
