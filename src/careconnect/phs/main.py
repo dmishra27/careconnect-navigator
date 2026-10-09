@@ -204,7 +204,11 @@ def main(argv: list[str] | None = None) -> None:
     if args.download:
         if _volume_mounted(cfg.landing_path):  # inside Databricks: straight into the Volume
             print(f"Downloading PHS files to {volume_dir}")
-            sources.download(Path(volume_dir))
+            try:
+                sources.download(Path(volume_dir))
+            except OSError as exc:  # URLError is an OSError
+                # Free Edition serverless has no internet access: load what is in the Volume
+                print(f"WARNING: download failed ({exc}); using files already in {volume_dir}")
         else:
             print(f"Downloading PHS files to {LOCAL_DIR}")
             sources.download(LOCAL_DIR)

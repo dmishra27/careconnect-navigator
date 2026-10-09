@@ -1,4 +1,8 @@
-# Monthly PHS waiting-times refresh: download -> bronze -> silver with data-quality checks.
+# Monthly PHS waiting-times refresh: landing Volume -> bronze -> silver with data-quality checks.
+#
+# Free Edition serverless compute has no internet access, so the job does not download.
+# Fetch new PHS files from a laptop first:  uv run phs --env dev --download
+# The job then loads them; if the file is unchanged since the last load it skips.
 
 resources:
   jobs:
@@ -21,7 +25,6 @@ resources:
               - "${bundle.target}"
               - "--config"
               - "${workspace.file_path}/project_config.yml"
-              - "--download"
           environment_key: default
 
       environments:
