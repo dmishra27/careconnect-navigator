@@ -13,9 +13,6 @@ dependencies = [
     "pyyaml",
 ]
 
-[project.scripts]
-main = "careconnect.main:main"
-
 [dependency-groups]
 dev = [
     "databricks-connect~=18.0.0",
