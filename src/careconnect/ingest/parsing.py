@@ -137,20 +137,22 @@ def pdf_sections(pages: list[str], title: str) -> list[Section]:
                 sections.append(Section(heading_path=path, text=text, page=page))
         buf.clear()
 
+    lines = [(n, ln) for n, page in enumerate(pages, start=1) for ln in page.splitlines()]
     buf_page = 1  # page of the last line added to buf
-    for page_no, page in enumerate(pages, start=1):
-        for line in page.splitlines():
-            if _is_pdf_heading(line):
-                flush(start_page)
-                heading = line.strip()
+    for i, (page_no, line) in enumerate(lines):
+        # a "heading" followed by a lowercase line is really a wrapped sentence
+        nxt = lines[i + 1][1].lstrip() if i + 1 < len(lines) else ""
+        if _is_pdf_heading(line) and not nxt[:1].islower():
+            flush(start_page)
+            heading = line.strip()
+            start_page = page_no
+        else:
+            if not buf:
                 start_page = page_no
-            else:
-                if not buf:
-                    start_page = page_no
-                elif page_no != buf_page:
-                    buf.append(PAGE_MARKER.format(page_no))  # section continues on a new page
-                buf.append(line.strip())
-                buf_page = page_no
+            elif page_no != buf_page:
+                buf.append(PAGE_MARKER.format(page_no))  # section continues on a new page
+            buf.append(line.strip())
+            buf_page = page_no
     flush(start_page)
     return _merge_tiny_sections(sections)
 
