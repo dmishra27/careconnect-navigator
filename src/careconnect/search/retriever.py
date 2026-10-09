@@ -1,4 +1,4 @@
-"""Query the AI Search index: hybrid (vector + keyword) search over current guidance.
+"""Query the AI Search index over current guidance (ANN by default, see config).
 
 uv run python -m careconnect.search.retriever "How do I complain about my GP?"
 """
@@ -65,14 +65,14 @@ class Retriever:
         query: str,
         k: int = 5,
         filters: dict | None = None,
-        query_type: str = "HYBRID",
+        query_type: str | None = None,
     ) -> list[Hit]:
         merged = {**DEFAULT_FILTERS, **(filters or {})}
         response = self.w.vector_search_indexes.query_index(
             index_name=self.cfg.chunks_index,
             columns=RETURN_COLUMNS,
             query_text=query,
-            query_type=query_type,
+            query_type=query_type or self.cfg.search_query_type,
             filters_json=json.dumps(merged),
             num_results=k,
         )
@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--env", default="dev")
     parser.add_argument("--config", default=None)
     parser.add_argument("-k", type=int, default=5)
-    parser.add_argument("--type", default="HYBRID", choices=["HYBRID", "ANN", "FULL_TEXT"])
+    parser.add_argument("--type", default=None, choices=["HYBRID", "ANN", "FULL_TEXT"])
     parser.add_argument("--source-type", choices=["leaflet", "policy"], default=None)
     args = parser.parse_args(argv)
 

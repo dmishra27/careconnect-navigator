@@ -16,6 +16,8 @@ class ProjectConfig(BaseModel):
     chunk_max_tokens: int = 400
     chunk_overlap_tokens: int = 60
     search_endpoint: str = "careconnect-search"  # Free Edition allows one AI Search endpoint
+    # ANN beat HYBRID on the Week 2 retrieval eval (MRR 0.83 vs 0.68); see docs/decisions
+    search_query_type: str = "ANN"
 
     @property
     def chunks_index(self) -> str:

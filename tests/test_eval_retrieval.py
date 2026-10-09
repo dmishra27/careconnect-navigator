@@ -73,3 +73,25 @@ def test_every_leaflet_label_has_evidence_in_its_leaflet():
                 assert answerable([single], chunks)[0], (
                     f"{q.id}: '{lab.evidence}' not in {lab.doc_id}"
                 )
+
+
+def test_embed_only_calls_endpoint_for_uncached_texts(tmp_path):
+    from types import SimpleNamespace as NS
+
+    from careconnect.evals.retrieval import EmbeddingCache, embed
+
+    calls = []
+
+    def query(name, input):
+        calls.append(list(input))
+        return NS(data=[NS(index=i, embedding=[float(len(t)), 1.0]) for i, t in enumerate(input)])
+
+    w = NS(serving_endpoints=NS(query=query))
+    cache = EmbeddingCache("ep", cache_dir=tmp_path)
+    first = embed(w, "ep", ["a", "bb", "a"], batch_size=1, pause_s=0, cache=cache)
+    assert first.shape == (3, 2)
+    assert calls == [["a"], ["bb"]]  # duplicate text embedded once
+
+    # a new cache object reads the saved file: no further calls
+    embed(w, "ep", ["bb", "a"], pause_s=0, cache=EmbeddingCache("ep", cache_dir=tmp_path))
+    assert len(calls) == 2

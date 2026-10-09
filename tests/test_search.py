@@ -66,7 +66,7 @@ def test_search_always_filters_to_current_and_merges_extra_filters():
     client = NS(vector_search_indexes=NS(query_index=query_index))
     Retriever(CFG, client).search("complaint", k=3, filters={"source_type": "policy"})
     assert json.loads(calls["filters_json"]) == {"status": "current", "source_type": "policy"}
-    assert calls["query_type"] == "HYBRID"
+    assert calls["query_type"] == "ANN"  # config default
     assert calls["num_results"] == 3
     assert calls["index_name"] == CFG.chunks_index
 
