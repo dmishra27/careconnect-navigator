@@ -142,7 +142,34 @@ def pdf_sections(pages: list[str], title: str) -> list[Section]:
                     start_page = page_no
                 buf.append(line.strip())
     flush(start_page)
-    return sections
+    return _merge_tiny_sections(sections)
+
+
+MIN_PDF_SECTION_WORDS = 4
+
+
+def _merge_tiny_sections(sections: list[Section]) -> list[Section]:
+    """Fold PDF fragments shorter than MIN_PDF_SECTION_WORDS into the following section.
+
+    Stray lines between two headings (a lone label, a contents entry) would
+    otherwise become near-empty chunks that only add noise to search.
+    """
+    merged: list[Section] = []
+    pending = ""
+    for sec in sections:
+        text = f"{pending} {sec.text}".strip() if pending else sec.text
+        if len(text.split()) < MIN_PDF_SECTION_WORDS:
+            pending = text
+            continue
+        merged.append(Section(heading_path=sec.heading_path, text=text, page=sec.page))
+        pending = ""
+    if pending:  # trailing fragment: attach to the last section, or keep if it is all there is
+        if merged:
+            last = merged[-1]
+            merged[-1] = Section(last.heading_path, f"{last.text} {pending}", last.page)
+        else:
+            merged.append(Section(sections[-1].heading_path, pending, sections[-1].page))
+    return merged
 
 
 def extract_pdf_pages(data: bytes) -> list[str]:
