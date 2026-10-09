@@ -75,23 +75,51 @@ def test_every_leaflet_label_has_evidence_in_its_leaflet():
                 )
 
 
-def test_embed_only_calls_endpoint_for_uncached_texts(tmp_path):
-    from types import SimpleNamespace as NS
-
+def test_embed_only_encodes_uncached_texts(tmp_path):
     from careconnect.evals.retrieval import EmbeddingCache, embed
 
-    calls = []
+    class Fake:
+        name, query_prefix = "fake", "q: "
 
-    def query(name, input):
-        calls.append(list(input))
-        return NS(data=[NS(index=i, embedding=[float(len(t)), 1.0]) for i, t in enumerate(input)])
+        def __init__(self):
+            self.calls = []
 
-    w = NS(serving_endpoints=NS(query=query))
-    cache = EmbeddingCache("ep", cache_dir=tmp_path)
-    first = embed(w, "ep", ["a", "bb", "a"], batch_size=1, pause_s=0, cache=cache)
+        def encode(self, texts):
+            self.calls.append(list(texts))
+            return [[float(len(t)), 1.0] for t in texts]
+
+    fake = Fake()
+    first = embed(
+        fake, ["a", "bb", "a"], batch_size=1, pause_s=0, cache=EmbeddingCache("f", tmp_path)
+    )
     assert first.shape == (3, 2)
-    assert calls == [["a"], ["bb"]]  # duplicate text embedded once
+    assert fake.calls == [["a"], ["bb"]]  # duplicate text encoded once
 
     # a new cache object reads the saved file: no further calls
-    embed(w, "ep", ["bb", "a"], pause_s=0, cache=EmbeddingCache("ep", cache_dir=tmp_path))
-    assert len(calls) == 2
+    embed(fake, ["bb", "a"], pause_s=0, cache=EmbeddingCache("f", tmp_path))
+    assert len(fake.calls) == 2
+
+    # queries get the model's prefix, so they are cached separately from passages
+    embed(fake, ["a"], is_query=True, pause_s=0, cache=EmbeddingCache("f", tmp_path))
+    assert fake.calls[-1] == ["q: a"]
+
+
+def test_databricks_embedder_backs_off_then_succeeds(monkeypatch):
+    from types import SimpleNamespace as NS
+
+    from databricks.sdk.errors import TooManyRequests
+
+    from careconnect.evals import retrieval
+
+    monkeypatch.setattr(retrieval.time, "sleep", lambda s: None)
+    attempts = []
+
+    def query(name, input):
+        attempts.append(1)
+        if len(attempts) < 3:
+            raise TooManyRequests("limit")
+        return NS(data=[NS(index=0, embedding=[1.0, 0.0])])
+
+    emb = retrieval.DatabricksEmbedder("ep", w=NS(serving_endpoints=NS(query=query)))
+    assert emb.encode(["x"]) == [[1.0, 0.0]]
+    assert len(attempts) == 3
