@@ -80,3 +80,21 @@ def test_all_real_leaflets_chunk_within_budget():
         assert chunks, path.name
         assert all(count_tokens(c.text.split("\n\n", 1)[1]) <= 400 for c in chunks)
         assert all(c.status == doc.status for c in chunks)
+
+
+def test_pdf_chunks_get_the_page_they_start_on():
+    from careconnect.ingest.parsing import pdf_sections
+
+    sentence = "The guarantee covers planned inpatient and day case treatment. "
+    pages = ["1. Rules\n" + sentence * 20] + [sentence * 20 for _ in range(3)]
+    doc = _doc(pdf_sections(pages, "Guide"))
+    chunks = chunk_document(doc, max_tokens=120, overlap_tokens=20)
+    page_list = [c.page for c in chunks]
+    assert page_list[0] == 1
+    assert page_list == sorted(page_list)
+    assert set(page_list) == {1, 2, 3, 4}
+    assert all("⟦" not in c.text for c in chunks)
+
+
+def test_page_markers_do_not_count_as_tokens():
+    assert count_tokens("one two ⟦p3⟧ three") == count_tokens("one two three")

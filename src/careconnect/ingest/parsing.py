@@ -7,7 +7,7 @@ from collections import Counter
 
 import yaml
 
-from careconnect.ingest.models import Document, Section
+from careconnect.ingest.models import PAGE_MARKER, PAGE_MARKER_RE, Document, Section
 
 _MD_HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _NUMBERED_HEADING = re.compile(r"^(\d{1,2}(\.\d{1,2}){0,2})\.?\s+([A-Z][^.!?]{2,80})$")
@@ -131,6 +131,7 @@ def pdf_sections(pages: list[str], title: str) -> list[Section]:
                 sections.append(Section(heading_path=path, text=text, page=page))
         buf.clear()
 
+    buf_page = 1  # page of the last line added to buf
     for page_no, page in enumerate(pages, start=1):
         for line in page.splitlines():
             if _is_pdf_heading(line):
@@ -140,7 +141,10 @@ def pdf_sections(pages: list[str], title: str) -> list[Section]:
             else:
                 if not buf:
                     start_page = page_no
+                elif page_no != buf_page:
+                    buf.append(PAGE_MARKER.format(page_no))  # section continues on a new page
                 buf.append(line.strip())
+                buf_page = page_no
     flush(start_page)
     return _merge_tiny_sections(sections)
 
@@ -158,7 +162,7 @@ def _merge_tiny_sections(sections: list[Section]) -> list[Section]:
     pending = ""
     for sec in sections:
         text = f"{pending} {sec.text}".strip() if pending else sec.text
-        if len(text.split()) < MIN_PDF_SECTION_WORDS:
+        if len(PAGE_MARKER_RE.sub(" ", text).split()) < MIN_PDF_SECTION_WORDS:
             pending = text
             continue
         merged.append(Section(heading_path=sec.heading_path, text=text, page=sec.page))
