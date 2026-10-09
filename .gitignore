@@ -21,3 +21,6 @@ scratch/**
 
 # Source PDFs are downloaded, not committed (see data/raw/policies/sources.csv)
 data/raw/policies/*.pdf
+
+# PHS open data is downloaded by `phs --download`, not committed (see data/raw/phs/README.md)
+data/raw/phs/*.csv

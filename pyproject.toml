@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 ingest = "careconnect.ingest.main:main"
+phs = "careconnect.phs.main:main"
 
 [dependency-groups]
 dev = [
