@@ -1,0 +1,11 @@
+clinic_id,name,site_type,town,postcode_district,address,phone,opening_hours,services
+CL001,Firth Valley Royal Infirmary,hospital,Larbank,FV1,"Royal Infirmary Road, Larbank FV1 4QX",01632 960 000,Mon-Fri 08:00-18:00 (outpatients); ED 24h,outpatients;emergency;maternity;imaging
+CL002,Carronside General Hospital,hospital,Grangeford,FV3,"Carron Way, Grangeford FV3 2LP",01632 960 000,Mon-Fri 08:30-17:30 (outpatients); MIU daily 08:00-21:00,outpatients;day_surgery;minor_injuries;rehabilitation
+CL003,Inverbrae Community Hospital,hospital,Inverbrae,FV7,"Brae Road, Inverbrae FV7 9DE",01632 960 000,Mon-Fri 09:00-17:00,outpatients;xray;physiotherapy
+CL004,Larbank Health Centre,community_clinic,Larbank,FV1,"Market Street, Larbank",01632 960 120,Mon-Fri 08:00-18:00,blood_tests;podiatry;diabetes_education
+CL005,Westfield Clinic,community_clinic,Larbank,FV2,"Westfield Avenue, Larbank",01632 960 100,Mon-Fri 09:00-17:00,child_health;health_visiting
+CL006,Grangeford Community Clinic,community_clinic,Grangeford,FV3,"Dock Road, Grangeford",01632 960 100,Mon-Fri 08:30-17:00; Tue to 19:00,physiotherapy;podiatry;blood_tests
+CL007,Harbourside Sexual Health Clinic,community_clinic,Grangeford,FV4,"Quay Street, Grangeford",01632 960 100,"Mon, Wed, Thu 10:00-19:00",sexual_health;contraception
+CL008,Inverbrae Health Centre,community_clinic,Inverbrae,FV7,"Station Road, Inverbrae",01632 960 100,Mon-Fri 09:00-17:00,blood_tests;podiatry;speech_and_language
+CL009,Kilbrannan Village Clinic,community_clinic,Kilbrannan,FV8,Kilbrannan,01632 960 100,"Tue, Thu 09:00-13:00",dressings;blood_tests;injections
+CL010,Muirhead Clinic,community_clinic,Muirhead,FV9,Muirhead,01632 960 100,"Mon, Fri 09:00-16:00",podiatry;physiotherapy

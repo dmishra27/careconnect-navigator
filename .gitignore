@@ -18,3 +18,6 @@ scratch/**
 !scratch/README.md
 **/explorations/**
 **/!explorations/README.md
+
+# Source PDFs are downloaded, not committed (see data/raw/policies/sources.csv)
+data/raw/policies/*.pdf
