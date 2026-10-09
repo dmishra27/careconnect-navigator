@@ -12,6 +12,12 @@ the label's evidence phrase, so labels work for any chunk size.
 
   uv run python -m careconnect.evals.retrieval --env dev
   uv run python -m careconnect.evals.retrieval --mode chunks --configs 400:60,200:40
+
+Free Edition throttles direct calls to the embedding endpoint, so the chunking
+experiment can instead embed on the laptop with an open model:
+
+  uv run --with sentence-transformers python -m careconnect.evals.retrieval \\
+      --mode chunks --embedder local
 """
 
 import argparse
@@ -162,29 +168,85 @@ class EmbeddingCache:
         return arr / np.clip(np.linalg.norm(arr, axis=1, keepdims=True), 1e-12, None)
 
 
+class DatabricksEmbedder:
+    """The embedding endpoint the index uses. Free Edition throttles direct calls hard."""
+
+    query_prefix = ""
+
+    def __init__(self, endpoint: str, w=None, max_attempts: int = 5, wait_s: float = 60):
+        if w is None:
+            from databricks.sdk import WorkspaceClient
+            from databricks.sdk.core import Config
+
+            # fail fast inside the SDK; we do our own, slower backoff below
+            w = WorkspaceClient(config=Config(retry_timeout_seconds=30))
+        self.w, self.endpoint, self.name = w, endpoint, endpoint
+        self.max_attempts, self.wait_s = max_attempts, wait_s
+
+    def encode(self, texts: list[str]) -> list[list[float]]:
+        from databricks.sdk.errors import TooManyRequests
+
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                resp = self.w.serving_endpoints.query(name=self.endpoint, input=texts)
+                return [d.embedding for d in sorted(resp.data, key=lambda d: d.index)]
+            except (TooManyRequests, TimeoutError):
+                if attempt == self.max_attempts:
+                    raise SystemExit(
+                        f"{self.endpoint} is still rate limited after {attempt} attempts. "
+                        "Progress is cached; re-run later, or use --embedder local."
+                    ) from None
+                wait = self.wait_s * attempt
+                print(f"  rate limited; waiting {wait:.0f}s (attempt {attempt})")
+                time.sleep(wait)
+        raise AssertionError("unreachable")
+
+
+class LocalEmbedder:
+    """Open model run on the laptop: no rate limits, same model for every chunking config.
+
+    Needs sentence-transformers (uv run --with sentence-transformers ...).
+    """
+
+    def __init__(self, model: str = "BAAI/bge-base-en-v1.5"):
+        from sentence_transformers import SentenceTransformer
+
+        self.model = SentenceTransformer(model)
+        self.name = "local-" + model.split("/")[-1]
+        # BGE models expect this instruction on queries (not on passages)
+        self.query_prefix = (
+            "Represent this sentence for searching relevant passages: " if "bge" in model else ""
+        )
+
+    def encode(self, texts: list[str]) -> list[list[float]]:
+        return self.model.encode(texts, normalize_embeddings=True).tolist()
+
+
 def embed(
-    w,
-    endpoint: str,
+    embedder,
     texts: list[str],
+    is_query: bool = False,
     batch_size: int = 64,
     pause_s: float = 2.0,
     cache: EmbeddingCache | None = None,
 ) -> np.ndarray:
-    """Embed texts (L2-normalised rows), only calling the endpoint for uncached texts.
+    """Embed texts (L2-normalised rows), only encoding texts not already cached.
 
-    Free Edition rate-limits pay-per-token embedding endpoints, so calls are paced
-    and each batch is cached as soon as it returns.
+    Each batch is cached as soon as it returns, so an interrupted run resumes.
     """
-    cache = cache or EmbeddingCache(endpoint)
+    texts = [embedder.query_prefix + t for t in texts] if is_query else texts
+    cache = cache or EmbeddingCache(embedder.name)
     todo = cache.missing(texts)
     if todo:
-        print(f"  embedding {len(todo)} new texts ({len(texts) - len(todo)} cached)")
+        print(
+            f"  embedding {len(todo)} new texts with {embedder.name}"
+            f" ({len(texts) - len(todo)} cached)"
+        )
     for n, i in enumerate(range(0, len(todo), batch_size)):
-        if n:
+        if n and pause_s:
             time.sleep(pause_s)
         batch = todo[i : i + batch_size]
-        resp = w.serving_endpoints.query(name=endpoint, input=batch)
-        cache.add(batch, [d.embedding for d in sorted(resp.data, key=lambda d: d.index)])
+        cache.add(batch, embedder.encode(batch))
         print(f"  {min(i + batch_size, len(todo))}/{len(todo)}")
     return cache.get(texts)
 
@@ -218,10 +280,10 @@ def run_index(cfg: ProjectConfig, questions: list[Question], k: int, query_type:
 
 
 def run_chunk_config(
-    w, cfg: ProjectConfig, questions: list[Question], chunks: list[Chunk], q_vecs, k: int
+    embedder, cfg: ProjectConfig, questions: list[Question], chunks: list[Chunk], q_vecs, k: int
 ) -> tuple[Rankings, dict]:
     pool = current_chunks(chunks)
-    c_vecs = embed(w, cfg.embedding_endpoint, [c.text for c in pool])
+    c_vecs = embed(embedder, [c.text for c in pool], pause_s=_pause(embedder))
     rankings = dense_rankings(questions, q_vecs, pool, c_vecs, k)
     tokens = sorted(c.token_count for c in pool)
     stats = {
@@ -233,6 +295,10 @@ def run_chunk_config(
         ),
     }
     return rankings, stats
+
+
+def _pause(embedder) -> float:
+    return 2.0 if isinstance(embedder, DatabricksEmbedder) else 0.0
 
 
 def _tokens(text: str) -> int:
@@ -292,6 +358,13 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("-k", type=int, default=10)
     parser.add_argument("--source", default=None, help="default: landing Volume")
     parser.add_argument("--no-mlflow", action="store_true")
+    parser.add_argument(
+        "--embedder",
+        choices=["databricks", "local"],
+        default="databricks",
+        help="chunking experiment only; 'local' avoids Free Edition rate limits",
+    )
+    parser.add_argument("--local-model", default="BAAI/bge-base-en-v1.5")
     args = parser.parse_args(argv)
 
     cfg = ProjectConfig.from_yaml(args.config or _find_config(), env=args.env)
@@ -324,12 +397,18 @@ def main(argv: list[str] | None = None) -> None:
         _print_table("Live AI Search index (query types)", results)
 
     if args.mode in ("chunks", "all"):
-        q_vecs = embed(w, cfg.embedding_endpoint, [q.question for q in questions])
+        if args.embedder == "local":
+            embedder = LocalEmbedder(args.local_model)
+        else:
+            embedder = DatabricksEmbedder(cfg.embedding_endpoint)
+        q_vecs = embed(
+            embedder, [q.question for q in questions], is_query=True, pause_s=_pause(embedder)
+        )
         results = []
         for pair in args.configs.split(","):
             max_t, overlap = (int(x) for x in pair.split(":"))
             chunks = build(reader, max_t, overlap).chunks
-            rankings, stats = run_chunk_config(w, cfg, questions, chunks, q_vecs, args.k)
+            rankings, stats = run_chunk_config(embedder, cfg, questions, chunks, q_vecs, args.k)
             metrics, rows = score(questions, rankings)
             metrics.update(stats)
             results.append((f"dense {max_t}/{overlap}", metrics))
@@ -339,10 +418,10 @@ def main(argv: list[str] | None = None) -> None:
                     "max_tokens": max_t,
                     "overlap_tokens": overlap,
                     "k": args.k,
-                    "embedding": cfg.embedding_endpoint,
+                    "embedding": embedder.name,
                 }
                 log_run(experiment, f"chunks-{max_t}-{overlap}", params, metrics, rows)
-        _print_table("Chunking configs (dense retrieval, same embedding model)", results)
+        _print_table(f"Chunking configs (dense retrieval, {embedder.name})", results)
 
     if not args.no_mlflow:
         print(f"\nLogged to MLflow experiment {experiment}")
