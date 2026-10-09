@@ -1,0 +1,31 @@
+# Daily ingest: landing Volume -> bronze_documents / silver_chunks (incremental by content hash).
+
+resources:
+  jobs:
+    ingest_job:
+      name: careconnect-ingest-${bundle.target}
+      max_concurrent_runs: 1
+
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?" # 06:00 every day
+        timezone_id: Europe/London
+        pause_status: PAUSED # unpause once the pipeline is stable
+
+      tasks:
+        - task_key: ingest
+          python_wheel_task:
+            package_name: careconnect
+            entry_point: ingest
+            parameters:
+              - "--env"
+              - "${bundle.target}"
+              - "--config"
+              - "${workspace.file_path}/project_config.yml"
+          environment_key: default
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "5"
+            dependencies:
+              - ../dist/*.whl

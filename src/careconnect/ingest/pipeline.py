@@ -122,14 +122,27 @@ def _in_list(ids) -> str:
     return ", ".join("'" + i.replace("'", "''") + "'" for i in ids)
 
 
-def write(spark, cfg, result: BuildResult, max_tokens: int, overlap_tokens: int) -> dict:
-    """Apply the build result to Delta tables incrementally. Returns run stats."""
+def write(
+    spark,
+    cfg,
+    result: BuildResult,
+    max_tokens: int,
+    overlap_tokens: int,
+    full_refresh: bool = False,
+) -> dict:
+    """Apply the build result to Delta tables incrementally. Returns run stats.
+
+    ``full_refresh`` rewrites every document even if its file is unchanged; use it
+    after changing parsing or chunking code, which the content hash cannot see.
+    """
     ensure_tables(spark, cfg)
     now = datetime.now(UTC).replace(tzinfo=None)
     existing = _existing_hashes(spark, cfg)
     current_ids = {d.doc_id for d in result.documents}
 
-    changed = [d for d in result.documents if existing.get(d.doc_id) != d.content_hash]
+    changed = [
+        d for d in result.documents if full_refresh or existing.get(d.doc_id) != d.content_hash
+    ]
     changed_ids = {d.doc_id for d in changed}
     removed_ids = set(existing) - current_ids
 

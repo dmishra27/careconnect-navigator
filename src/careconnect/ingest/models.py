@@ -1,6 +1,12 @@
 """Plain data structures shared by the ingest steps (no Spark dependency)."""
 
+import re
 from dataclasses import dataclass, field
+
+# Inline page marker placed in PDF section text where a new page begins, e.g. "⟦p7⟧".
+# The chunker uses it to give each chunk the page it starts on, then strips it.
+PAGE_MARKER = "⟦p{}⟧"
+PAGE_MARKER_RE = re.compile(r"\s*⟦p(\d+)⟧\s*")
 
 
 @dataclass

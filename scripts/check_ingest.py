@@ -38,3 +38,11 @@ spark.sql(f"""
     FROM {cfg.table("silver_chunks")} WHERE source_type = 'policy'
     ORDER BY chunk_id LIMIT 5
 """).show(truncate=False)
+
+print("Page spread per policy (pages should increase through each document)")
+spark.sql(f"""
+    SELECT doc_id, COUNT(*) AS chunks, COUNT(DISTINCT page) AS distinct_pages,
+           MIN(page) AS first_page, MAX(page) AS last_page
+    FROM {cfg.table("silver_chunks")} WHERE source_type = 'policy'
+    GROUP BY doc_id ORDER BY doc_id
+""").show(truncate=False)

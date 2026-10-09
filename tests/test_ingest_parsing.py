@@ -88,3 +88,11 @@ def test_tiny_pdf_fragments_are_folded_into_next_section():
     assert len(sections) == 1
     assert sections[0].heading_path == ["Guide", "2. Purpose"]
     assert sections[0].text.startswith("Contents This guidance")
+
+
+def test_pdf_section_spanning_pages_carries_page_marker():
+    pages = ["1. Rules\nFirst page text here.", "Second page text here."]
+    sections = pdf_sections(pages, "Guide")
+    assert len(sections) == 1
+    assert sections[0].page == 1
+    assert "⟦p2⟧" in sections[0].text
