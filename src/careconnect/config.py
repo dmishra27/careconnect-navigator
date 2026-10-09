@@ -15,6 +15,12 @@ class ProjectConfig(BaseModel):
     landing_volume: str = "landing"
     chunk_max_tokens: int = 400
     chunk_overlap_tokens: int = 60
+    search_endpoint: str = "careconnect-search"  # Free Edition allows one AI Search endpoint
+
+    @property
+    def chunks_index(self) -> str:
+        """AI Search index kept in sync with silver_chunks."""
+        return self.table("silver_chunks_index")
 
     @property
     def landing_path(self) -> str:
