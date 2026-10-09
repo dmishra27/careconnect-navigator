@@ -6,8 +6,8 @@
   Rerun from files already in the Volume:
     uv run phs --env dev
 
-  Check transforms and expectations without writing tables:
-    uv run phs --source data/raw/phs --dry-run
+  Download and check transforms and expectations without touching Databricks:
+    uv run phs --download --dry-run
 
 Tables (in the environment schema):
   bronze_phs_ongoing_waits   raw strings + source file, hash and load time
@@ -190,7 +190,9 @@ def main(argv: list[str] | None = None) -> None:
         else:
             print(f"Downloading PHS files to {LOCAL_DIR}")
             sources.download(LOCAL_DIR)
-            if not args.dry_run:
+            if args.dry_run:  # nothing goes to Databricks; check the local copy
+                args.source = args.source or str(LOCAL_DIR)
+            else:
                 sources.upload(LOCAL_DIR, volume_dir)
 
     folder = (args.source or volume_dir).rstrip("/")
