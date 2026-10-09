@@ -59,9 +59,15 @@ def check_schema(raw: pd.DataFrame) -> None:
         raise SchemaError(f"ongoing waits file is missing columns {missing}")
 
 
-def board_lookup(health_boards: pd.DataFrame, special_boards: pd.DataFrame) -> dict[str, str]:
+def board_lookup(
+    health_boards: pd.DataFrame,
+    special_boards: pd.DataFrame,
+    isd_boards: pd.DataFrame | None = None,
+) -> dict[str, str]:
     names = dict(zip(health_boards["HB"], health_boards["HBName"], strict=False))
     names.update(zip(special_boards["SHB"], special_boards["SHBName"], strict=False))
+    if isd_boards is not None:  # S27 codes, e.g. non-NHS providers
+        names.update(zip(isd_boards["ISDHBT"], isd_boards["ISDHBTName"], strict=False))
     names[SCOTLAND] = "Scotland"
     return names
 

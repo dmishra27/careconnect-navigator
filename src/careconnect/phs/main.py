@@ -56,7 +56,10 @@ def load(reader: SourceReader, folder: str) -> dict[str, tuple[bytes, pd.DataFra
 
 def build(files: dict) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, list[dict]]:
     raw = files["ongoing_waits"][1]
-    boards = board_lookup(files["health_boards"][1], files["special_boards"][1])
+    isd = files.get("isd_boards")
+    boards = board_lookup(
+        files["health_boards"][1], files["special_boards"][1], isd[1] if isd else None
+    )
     specialties = specialty_lookup(files["specialties"][1])
     silver = to_silver(raw, boards, specialties)
     kept, rejects, results = dq.apply(silver, dq.expectations())
@@ -75,10 +78,22 @@ def summary(raw, kept, rejects, results) -> dict:
         "specialties": int(kept["specialty"].nunique()),
         "patient_types": sorted(kept["patient_type"].unique().tolist()),
         "scotland_all_specialty_rows": len(scot),
+        "unknown_boards": _top(kept.loc[kept["board_name"].isna(), "hbt"]),
+        "unknown_specialties": _top(
+            kept.loc[kept["specialty_name"].isna() & ~kept["is_all_specialties"], "specialty"]
+        ),
+        "blank_counts_by_patient_type": kept.loc[kept["number_waiting"].isna(), "patient_type"]
+        .value_counts()
+        .to_dict(),
         "failed_expectations": {
             r["expectation"]: r["failed_rows"] for r in results if r["failed_rows"]
         },
     }
+
+
+def _top(codes: pd.Series, n: int = 5) -> dict[str, int]:
+    """Most frequent codes, so unmatched lookups are easy to diagnose."""
+    return {str(k): int(v) for k, v in codes.value_counts().head(n).items()}
 
 
 # ------------------------------------------------------------------ Spark writes

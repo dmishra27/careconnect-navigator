@@ -43,6 +43,13 @@ RESOURCES = [
         "Non-standard Geography: Special Health Boards and National Facilities",
     ),
     Resource(
+        "isd_boards",
+        "isd_health_board_of_treatment.csv",
+        f"{PORTAL}/dataset/9f942fdb-e59e-44f5-b534-d6e17229cc7b/resource/"
+        "042f9b17-a42d-4112-b40b-32c094fdc01d/download/isd_health_board_of_treatment.csv",
+        "Geography Codes and Labels: ISD Health Board of Treatment (S27 codes)",
+    ),
+    Resource(
         "specialties",
         "specialty_codes.csv",
         f"{PORTAL}/dataset/688c7ea0-4845-4b03-9df0-4149c72cb7f0/resource/"
