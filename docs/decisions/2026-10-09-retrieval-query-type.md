@@ -37,3 +37,37 @@ available through the retriever's `query_type` argument and `--type` on the CLI.
   matching helps. Add such questions before revisiting.
 - 46 questions is small: one question moves a recall figure by about 2 points.
 - A reranker on top of HYBRID was not tested.
+
+---
+
+# Chunking: keep 400 tokens with 60 overlap
+
+- Date: 2026-10-09
+- Status: accepted
+
+## Evidence
+
+Same 46 questions, chunk sets rebuilt from the landing Volume per config and ranked by
+cosine similarity with one local embedding model (`BAAI/bge-base-en-v1.5`), because
+Free Edition throttles direct calls to `databricks-gte-large-en`
+(MLflow runs `chunks-*`):
+
+| Max/overlap | Chunks | R@1   | R@5   | R@10  | MRR   | Doc R@5 | Tokens in top 5 |
+|-------------|--------|-------|-------|-------|-------|---------|-----------------|
+| 200/40      | 561    | 0.630 | 0.848 | 0.913 | 0.722 | 0.935   | 604             |
+| **400/60**  | 355    | 0.717 | 0.891 | 0.935 | 0.787 | 0.957   | 909             |
+| 800/120     | 277    | 0.717 | 0.891 | 0.935 | 0.788 | 0.935   | 1,286           |
+
+## Decision
+
+Keep 400/60. Going to 800/120 gains nothing on recall or MRR but sends about 40% more
+text to the LLM for every answer. 200/40 is cheaper but loses the top result for four
+more questions.
+
+## Notes
+
+- Median chunk size is not a useful comparison here: leaflet sections are short whatever
+  the budget, so the size distribution has two groups and the median moves between them.
+- The local model scores slightly below the index model on the same chunks
+  (MRR 0.787 vs 0.828 for ANN), which is expected. The comparison between configs uses
+  one model throughout, so it is fair.
