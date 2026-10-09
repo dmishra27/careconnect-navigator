@@ -133,11 +133,11 @@ def _overwrite(spark, pdf: pd.DataFrame, table: str) -> None:
 
 
 def _current_hash(spark, cfg) -> str | None:
-    try:
-        row = spark.sql(f"SELECT max(source_sha256) AS h FROM {cfg.table(BRONZE)}").first()
-        return row["h"] if row else None
-    except Exception:  # table does not exist yet
+    # check first: querying a missing table makes Spark Connect log a long error
+    if not spark.catalog.tableExists(cfg.table(BRONZE)):
         return None
+    row = spark.sql(f"SELECT max(source_sha256) AS h FROM {cfg.table(BRONZE)}").first()
+    return row["h"] if row else None
 
 
 def write(spark, cfg, files, raw, kept, rejects, results, full_refresh: bool) -> dict:
