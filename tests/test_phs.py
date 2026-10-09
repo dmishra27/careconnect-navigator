@@ -115,3 +115,9 @@ def test_build_and_summary_end_to_end():
 def test_resources_are_unique_https_csv_sources():
     assert len({r.file_name for r in RESOURCES}) == len(RESOURCES)
     assert all(r.url.startswith("https://www.opendata.nhs.scot/") for r in RESOURCES)
+
+
+def test_windows_1252_lookup_with_non_breaking_space():
+    data = "SHB,SHBName,Country\nSB0801,Golden\xa0Jubilee ,S92000003\n".encode("cp1252")
+    df = read_csv(data)
+    assert df.loc[0, "SHBName"] == "Golden Jubilee"

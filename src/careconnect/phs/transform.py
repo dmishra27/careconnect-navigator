@@ -35,12 +35,22 @@ class SchemaError(ValueError):
     """The source file no longer has the columns this pipeline expects."""
 
 
+def decode(data: bytes) -> str:
+    """PHS files are mostly UTF-8 (often with a BOM); some older lookups are Windows-1252."""
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return data.decode("cp1252")
+
+
 def read_csv(data: bytes) -> pd.DataFrame:
     """Read a PHS CSV as strings: BOM removed, datastore '_id' dropped, cells trimmed."""
-    df = pd.read_csv(io.BytesIO(data), dtype=str, keep_default_na=False, encoding="utf-8-sig")
+    df = pd.read_csv(io.StringIO(decode(data)), dtype=str, keep_default_na=False)
+    df.columns = [c.replace("\xa0", " ") for c in df.columns]
     df = df.drop(columns=[c for c in df.columns if c == "_id"])
     df.columns = [c.strip() for c in df.columns]
-    return df.apply(lambda col: col.str.strip())
+    # non-breaking spaces (common in cp1252 lookups) would break code matching
+    return df.apply(lambda col: col.str.replace("\xa0", " ").str.strip())
 
 
 def check_schema(raw: pd.DataFrame) -> None:
