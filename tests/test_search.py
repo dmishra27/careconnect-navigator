@@ -69,3 +69,27 @@ def test_search_always_filters_to_current_and_merges_extra_filters():
     assert calls["query_type"] == "HYBRID"
     assert calls["num_results"] == 3
     assert calls["index_name"] == CFG.chunks_index
+
+
+def test_existing_index_still_building_is_not_synced():
+    from careconnect.search.index import ensure_index
+
+    synced = []
+    indexes = NS(
+        get_index=lambda name: NS(status=NS(ready=False)),
+        sync_index=lambda name: synced.append(name),
+    )
+    assert ensure_index(NS(vector_search_indexes=indexes), CFG) is False
+    assert synced == []
+
+
+def test_existing_ready_index_is_synced():
+    from careconnect.search.index import ensure_index
+
+    synced = []
+    indexes = NS(
+        get_index=lambda name: NS(status=NS(ready=True)),
+        sync_index=lambda name: synced.append(name),
+    )
+    ensure_index(NS(vector_search_indexes=indexes), CFG)
+    assert synced == [CFG.chunks_index]

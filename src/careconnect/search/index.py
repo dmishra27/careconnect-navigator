@@ -83,7 +83,7 @@ def ensure_endpoint(w: WorkspaceClient, name: str) -> None:
 def ensure_index(w: WorkspaceClient, cfg: ProjectConfig) -> bool:
     """Create the index if missing, else trigger a sync. Returns True if newly created."""
     try:
-        w.vector_search_indexes.get_index(cfg.chunks_index)
+        existing = w.vector_search_indexes.get_index(cfg.chunks_index)
     except _MISSING:
         print(f"Creating index {cfg.chunks_index} on {cfg.table('silver_chunks')}...")
         w.vector_search_indexes.create_index(
@@ -94,13 +94,17 @@ def ensure_index(w: WorkspaceClient, cfg: ProjectConfig) -> bool:
             delta_sync_index_spec=index_spec(cfg),
         )
         return True
+    if not (existing.status and existing.status.ready):
+        # still building (e.g. first run timed out): a sync would be rejected, so just wait
+        print(f"Index {cfg.chunks_index} exists but is still building; waiting")
+        return False
     print(f"Index {cfg.chunks_index} exists; triggering sync")
     w.vector_search_indexes.sync_index(cfg.chunks_index)
     return False
 
 
 def wait_until_ready(
-    w: WorkspaceClient, index_name: str, expected_rows: int | None, timeout_s: int = 1800
+    w: WorkspaceClient, index_name: str, expected_rows: int | None, timeout_s: int = 3600
 ) -> int:
     """Poll until the index is ready and (if given) holds the expected row count."""
     start = time.monotonic()
