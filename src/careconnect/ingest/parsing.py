@@ -12,6 +12,8 @@ from careconnect.ingest.models import PAGE_MARKER, PAGE_MARKER_RE, Document, Sec
 _MD_HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _NUMBERED_HEADING = re.compile(r"^(\d{1,2}(\.\d{1,2}){0,2})\.?\s+([A-Z][^.!?]{2,80})$")
 _KEYWORD_HEADING = re.compile(r"^(Annex|Appendix|Part|Section|Chapter|Schedule)\s+[\w.]+\b.{0,70}$")
+# contents-page entry: "Appendix 3: Assessment Matrix .. 46" or "1. Introduction ....... 4"
+_TOC_LINE = re.compile(r"(\.\s?){2,}\s*\d{1,3}\s*$")
 _PAGE_NUMBER = re.compile(r"^\s*(page\s*)?\d{1,3}(\s*(of|/)\s*\d{1,3})?\s*$", re.IGNORECASE)
 
 
@@ -108,7 +110,11 @@ def clean_pdf_pages(pages: list[str]) -> list[str]:
 
     cleaned = []
     for lines in split_pages:
-        kept = [ln for ln in lines if ln and ln not in repeated and not _PAGE_NUMBER.match(ln)]
+        kept = [
+            ln
+            for ln in lines
+            if ln and ln not in repeated and not _PAGE_NUMBER.match(ln) and not _TOC_LINE.search(ln)
+        ]
         text = "\n".join(kept)
         text = re.sub(r"(\w)-\n(\w)", r"\1\2", text)  # re-join hyphenated words
         cleaned.append(text)

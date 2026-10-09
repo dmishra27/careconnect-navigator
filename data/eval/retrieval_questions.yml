@@ -1,0 +1,214 @@
+# Labelled questions for retrieval evaluation (Week 2, Step 9).
+#
+# A retrieved chunk counts as relevant when its doc_id matches a label AND its text
+# contains that label's evidence phrase (case, markdown and whitespace ignored).
+# Labels never name chunk ids, so the same set scores any chunking config.
+# Questions are paraphrased on purpose: they should not just repeat the leaflet wording.
+
+questions:
+  # ---------------------------------------------------------------- complaints
+  - id: q01
+    question: Is there a deadline for raising a complaint about my hospital care?
+    relevant:
+      - {doc_id: fvhb-16, evidence: "normally within 6 months"}
+  - id: q02
+    question: How long does a full investigation of a serious complaint take?
+    relevant:
+      - {doc_id: fvhb-16, evidence: "20 working days"}
+  - id: q03
+    question: Who can look at my complaint if I'm still not happy after the hospital has investigated it?
+    relevant:
+      - {doc_id: fvhb-16, evidence: "Scottish Public Services Ombudsman"}
+  - id: q35
+    question: Is there an independent service that can help me with an NHS complaint?
+    relevant:
+      - {doc_id: fvhb-18, evidence: "raise a concern or make a complaint"}
+      - {doc_id: fvhb-16, evidence: "Patient Advice and Support Service can help you make a complaint"}
+  - id: q45
+    question: Can mediation be used to sort out a disagreement about my NHS care?
+    relevant:
+      - {doc_id: policy-charter-patient-rights-2022, evidence: "mediation"}
+  - id: q46
+    question: What is the first stage of the NHS complaints handling procedure?
+    relevant:
+      - {doc_id: fvhb-16, evidence: "Stage 1, early resolution"}
+      - {doc_id: policy-nhs-model-complaints-procedure, evidence: "early resolution"}
+
+  # -------------------------------------------------------------- appointments
+  - id: q04
+    question: How quickly do I need to respond when the hospital contacts me to agree a date?
+    relevant:
+      - {doc_id: fvhb-02, evidence: "reply within 7 days"}
+  - id: q05
+    question: How many times can I rearrange my appointment without losing my place on the list?
+    relevant:
+      - {doc_id: fvhb-02, evidence: "change your appointment once"}
+  - id: q06
+    question: Can I cancel my appointment by text or email instead of phoning?
+    relevant:
+      - {doc_id: fvhb-02, evidence: "use the link in your appointment text message"}
+  - id: q07
+    question: If my child misses a hospital appointment, will they be sent back to the GP?
+    relevant:
+      - {doc_id: fvhb-03, evidence: "under 16"}
+  - id: q08
+    question: I missed my appointment and was discharged to my GP. Do I have to start waiting all over again?
+    relevant:
+      - {doc_id: fvhb-03, evidence: "A new referral starts a new waiting time"}
+  - id: q28
+    question: How do video consultations work and do I need to install anything?
+    relevant:
+      - {doc_id: fvhb-13, evidence: "NHS Near Me"}
+  - id: q29
+    question: How early should I get to my outpatient clinic?
+    relevant:
+      - {doc_id: fvhb-13, evidence: "arrive 10 minutes before"}
+  - id: q42
+    question: What happens if I turn down two appointment dates I've been offered?
+    relevant:
+      - {doc_id: policy-waiting-for-nhs-treatment-2023, evidence: "refuse 2 reasonable offers"}
+
+  # ----------------------------------------------------- sites and services
+  - id: q09
+    question: What time does the minor injuries unit close?
+    relevant:
+      - {doc_id: fvhb-04, evidence: "Minor Injuries Unit: open every day 8am to 9pm"}
+      - {doc_id: fvhb-20, evidence: "open 8am to 9pm"}
+  - id: q10
+    question: Can I go to A&E at Inverbrae Community Hospital?
+    relevant:
+      - {doc_id: fvhb-04, evidence: "no Emergency Department or Minor Injuries Unit at Inverbrae"}
+  - id: q11
+    question: Are hospital clinics open on bank holidays?
+    relevant:
+      - {doc_id: fvhb-04, evidence: "Outpatient clinics are closed on public holidays"}
+  - id: q12
+    question: Where can I get contraception, and is there a walk-in session?
+    relevant:
+      - {doc_id: fvhb-05, evidence: "Harbourside Sexual Health Clinic"}
+  - id: q13
+    question: How do I book a blood test at a community clinic?
+    relevant:
+      - {doc_id: fvhb-05, evidence: "Blood test appointments can be booked online"}
+  - id: q41
+    question: How many people does the health board look after?
+    relevant:
+      - {doc_id: fvhb-01, evidence: "around 400,000 people"}
+
+  # ---------------------------------------------------------------- travel
+  - id: q14
+    question: Do I have to pay to park at the hospital?
+    relevant:
+      - {doc_id: fvhb-06, evidence: "Parking is free"}
+  - id: q15
+    question: Can I charge my electric car at the Royal Infirmary?
+    relevant:
+      - {doc_id: fvhb-06, evidence: "Charging points are available in Car Park A"}
+  - id: q16
+    question: How far in advance do I need to book patient transport?
+    relevant:
+      - {doc_id: fvhb-07, evidence: "at least 3 working days before your appointment"}
+  - id: q17
+    question: Which bus goes to the Royal Infirmary from Larbank town centre?
+    relevant:
+      - {doc_id: fvhb-07, evidence: "Routes 8 and 8A"}
+  - id: q18
+    question: Can I get my bus fare back for a hospital visit, and how long do I have to claim?
+    relevant:
+      - {doc_id: fvhb-08, evidence: "claim within 3 months"}
+  - id: q19
+    question: Can the person who comes with me to hospital get their travel paid too?
+    relevant:
+      - {doc_id: fvhb-08, evidence: "Travel for an escort"}
+
+  # ------------------------------------------------------------ access
+  - id: q20
+    question: Can my 12-year-old translate for me at the appointment?
+    relevant:
+      - {doc_id: fvhb-09, evidence: "children should never be asked to interpret"}
+  - id: q21
+    question: I'm Deaf and use sign language. How can I contact the hospital?
+    relevant:
+      - {doc_id: fvhb-09, evidence: "contactSCOTLAND-BSL"}
+  - id: q22
+    question: Can I bring my guide dog into the hospital?
+    relevant:
+      - {doc_id: fvhb-10, evidence: "Assistance dogs are welcome"}
+  - id: q23
+    question: My son is autistic and struggles in busy waiting rooms. What help is available?
+    relevant:
+      - {doc_id: fvhb-10, evidence: "quiet waiting area"}
+
+  # ------------------------------------------------- waiting and referrals
+  - id: q24
+    question: What is the longest I should wait from referral to starting treatment?
+    relevant:
+      - {doc_id: fvhb-11, evidence: "within 18 weeks of referral"}
+  - id: q25
+    question: What is the Treatment Time Guarantee?
+    relevant:
+      - {doc_id: fvhb-11, evidence: "Treatment Time Guarantee"}
+      - {doc_id: policy-waiting-times-guidance-2023, evidence: "Treatment Time Guarantee"}
+      - {doc_id: policy-patient-rights-scotland-act-2011, evidence: "treatment time guarantee"}
+  - id: q43
+    question: What does the law say about how long an eligible patient can wait for agreed treatment?
+    relevant:
+      - {doc_id: policy-patient-rights-scotland-act-2011, evidence: "maximum waiting time"}
+      - {doc_id: fvhb-11, evidence: "within 12 weeks"}
+  - id: q44
+    question: Which regulations set out the rules for the treatment time guarantee?
+    relevant:
+      - {doc_id: policy-waiting-times-guidance-2023, evidence: "Regulations 2012"}
+  - id: q26
+    question: I haven't heard anything since my GP referred me a month ago. What should I do?
+    relevant:
+      - {doc_id: fvhb-12, evidence: "within 4 weeks of your GP referral"}
+  - id: q27
+    question: Who looks at my referral when it arrives at the hospital?
+    relevant:
+      - {doc_id: fvhb-12, evidence: "A specialist reviews the referral"}
+
+  # ------------------------------------------------------ surgery and wards
+  - id: q30
+    question: Can I take the bus home after my day surgery?
+    relevant:
+      - {doc_id: fvhb-14, evidence: "not by public transport"}
+  - id: q31
+    question: I've got a cold the week before my operation. Who should I tell?
+    relevant:
+      - {doc_id: fvhb-14, evidence: "cough, cold, fever"}
+  - id: q32
+    question: How many people can visit a patient at the same time?
+    relevant:
+      - {doc_id: fvhb-15, evidence: "two visitors at a bedside"}
+  - id: q33
+    question: I had a stomach bug yesterday. Can I still visit my mum on the ward?
+    relevant:
+      - {doc_id: fvhb-15, evidence: "diarrhoea, vomiting"}
+
+  # ----------------------------------------------- feedback, records, help
+  - id: q34
+    question: Where can I post a review of my hospital experience online?
+    relevant:
+      - {doc_id: fvhb-17, evidence: "Care Opinion"}
+      - {doc_id: policy-charter-patient-rights-2022, evidence: "Care Opinion"}
+  - id: q36
+    question: How long does it take to get a copy of my medical records?
+    relevant:
+      - {doc_id: fvhb-19, evidence: "within one month"}
+  - id: q37
+    question: Can I request my elderly father's hospital records?
+    relevant:
+      - {doc_id: fvhb-19, evidence: "Power of Attorney"}
+  - id: q38
+    question: My husband's face is drooping and his speech is slurred. What should I do?
+    relevant:
+      - {doc_id: fvhb-20, evidence: "Signs of a stroke"}
+  - id: q39
+    question: I feel really unwell at night and my GP surgery is closed. Who do I phone?
+    relevant:
+      - {doc_id: fvhb-20, evidence: "Call 111 if you are ill"}
+  - id: q40
+    question: How long until I get the results of my scan?
+    relevant:
+      - {doc_id: fvhb-21, evidence: "scan reports usually take 1 to 3 weeks"}

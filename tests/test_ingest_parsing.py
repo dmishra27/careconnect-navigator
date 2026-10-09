@@ -96,3 +96,23 @@ def test_pdf_section_spanning_pages_carries_page_marker():
     assert len(sections) == 1
     assert sections[0].page == 1
     assert "⟦p2⟧" in sections[0].text
+
+
+def test_contents_page_entries_are_dropped():
+    pages = [
+        "Contents\n1. Introduction ........ 4\n"
+        "Appendix 3: Feedback, Comments, Concerns or Complaints Assessment Matrix .. 46",
+        "1. Introduction\nThis procedure explains complaints.",
+    ]
+    cleaned = clean_pdf_pages(pages)
+    assert "Assessment Matrix" not in cleaned[0]
+    assert "........" not in cleaned[0]
+    sections = pdf_sections(cleaned, "Procedure")
+    assert sections[-1].heading_path == ["Procedure", "1. Introduction"]
+
+
+def test_sentences_ending_in_numbers_are_kept():
+    cleaned = clean_pdf_pages(
+        ["You must respond within 20 working days. See section 4.2 of part 3"]
+    )
+    assert "section 4.2 of part 3" in cleaned[0]
