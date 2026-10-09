@@ -1,6 +1,6 @@
 dev:
   catalog: workspace
-  schema_name: dmishra27
+  schema_name: careconnect_dev
   experiment_name: careconnect-dev
   llm_endpoint: databricks-meta-llama-3-3-70b-instruct
   judge_endpoint: databricks-meta-llama-3-1-8b-instruct

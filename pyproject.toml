@@ -11,10 +11,13 @@ dependencies = [
     "openai",
     "pydantic>=2",
     "pyyaml",
+    "pypdf>=6.20.0",
 ]
 
 [project.scripts]
-main = "careconnect.main:main"
+ingest = "careconnect.ingest.main:main"
+phs = "careconnect.phs.main:main"
+build-index = "careconnect.search.index:main"
 
 [dependency-groups]
 dev = [
