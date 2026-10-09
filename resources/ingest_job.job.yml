@@ -1,4 +1,5 @@
-# Daily ingest: landing Volume -> bronze_documents / silver_chunks (incremental by content hash).
+# Daily ingest: landing Volume -> bronze_documents / silver_chunks (incremental by content hash),
+# then refresh the AI Search index so new or changed chunks become searchable.
 
 resources:
   jobs:
@@ -16,6 +17,19 @@ resources:
           python_wheel_task:
             package_name: careconnect
             entry_point: ingest
+            parameters:
+              - "--env"
+              - "${bundle.target}"
+              - "--config"
+              - "${workspace.file_path}/project_config.yml"
+          environment_key: default
+
+        - task_key: sync_index
+          depends_on:
+            - task_key: ingest
+          python_wheel_task:
+            package_name: careconnect
+            entry_point: build-index
             parameters:
               - "--env"
               - "${bundle.target}"
