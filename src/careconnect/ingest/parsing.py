@@ -143,16 +143,16 @@ def pdf_sections(pages: list[str], title: str) -> list[Section]:
         # a "heading" followed by a lowercase line is really a wrapped sentence
         nxt = lines[i + 1][1].lstrip() if i + 1 < len(lines) else ""
         if _is_pdf_heading(line) and not nxt[:1].islower():
-                flush(start_page)
-                heading = line.strip()
+            flush(start_page)
+            heading = line.strip()
+            start_page = page_no
+        else:
+            if not buf:
                 start_page = page_no
-            else:
-                if not buf:
-                    start_page = page_no
-                elif page_no != buf_page:
-                    buf.append(PAGE_MARKER.format(page_no))  # section continues on a new page
-                buf.append(line.strip())
-                buf_page = page_no
+            elif page_no != buf_page:
+                buf.append(PAGE_MARKER.format(page_no))  # section continues on a new page
+            buf.append(line.strip())
+            buf_page = page_no
     flush(start_page)
     return _merge_tiny_sections(sections)
 
