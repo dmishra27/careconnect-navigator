@@ -78,3 +78,13 @@ def test_pdf_sections_detect_numbered_headings():
     ]
     assert sections[0].text == "The Treatment Time Guarantee is 12 weeks."
     assert sections[1].page == 2
+
+
+def test_tiny_pdf_fragments_are_folded_into_next_section():
+    pages = [
+        "1. Introduction\nContents\n2. Purpose\nThis guidance explains the waiting time rules."
+    ]
+    sections = pdf_sections(pages, "Guide")
+    assert len(sections) == 1
+    assert sections[0].heading_path == ["Guide", "2. Purpose"]
+    assert sections[0].text.startswith("Contents This guidance")

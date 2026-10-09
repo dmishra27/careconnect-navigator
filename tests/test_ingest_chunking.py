@@ -47,6 +47,22 @@ def test_long_section_respects_budget_and_overlaps():
     assert first_body.split("\n\n")[-1] == second_body.split("\n\n")[0]
 
 
+def test_budget_holds_with_many_small_units_and_overlap():
+    # many one-word paragraphs: per-unit rounding used to undercount the real chunk size
+    units = "\n\n".join(f"w{i}" for i in range(400))
+    doc = _doc([Section(["Many"], units)])
+    chunks = chunk_document(doc, max_tokens=50, overlap_tokens=20)
+    assert all(c.token_count <= 50 for c in chunks)
+
+
+def test_overlap_is_trimmed_when_next_unit_is_large():
+    small = "a " * 15  # ~20 tokens
+    big = "b " * 35  # ~46 tokens
+    doc = _doc([Section(["S"], f"{small}\n\n{small}\n\n{big}")])
+    chunks = chunk_document(doc, max_tokens=50, overlap_tokens=25)
+    assert all(c.token_count <= 50 for c in chunks)
+
+
 def test_overlap_must_be_smaller_than_budget():
     with pytest.raises(ValueError):
         chunk_document(_doc([Section(["A"], "x")]), max_tokens=50, overlap_tokens=50)

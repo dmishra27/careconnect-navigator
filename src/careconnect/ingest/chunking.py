@@ -42,25 +42,28 @@ def _units(text: str, max_tokens: int) -> list[str]:
     return units
 
 
+def _size(parts: list[str]) -> int:
+    """Token estimate of parts joined into one chunk (measured, not summed, to avoid drift)."""
+    return count_tokens("\n\n".join(parts)) if parts else 0
+
+
 def _pack(units: list[str], max_tokens: int, overlap_tokens: int) -> list[str]:
     chunks: list[str] = []
     current: list[str] = []
-    size = 0
     for unit in units:
-        n = count_tokens(unit)
-        if current and size + n > max_tokens:
+        if current and _size(current + [unit]) > max_tokens:
             chunks.append("\n\n".join(current))
+            # carry trailing units as overlap, newest first, within the overlap budget
             carry: list[str] = []
-            carried = 0
             for prev in reversed(current):
-                c = count_tokens(prev)
-                if carried + c > overlap_tokens:
+                if _size([prev] + carry) > overlap_tokens:
                     break
                 carry.insert(0, prev)
-                carried += c
-            current, size = carry, carried
+            # drop overlap from the front if it would push the next chunk over budget
+            while carry and _size(carry + [unit]) > max_tokens:
+                carry.pop(0)
+            current = carry
         current.append(unit)
-        size += n
     if current:
         chunks.append("\n\n".join(current))
     return chunks
