@@ -67,6 +67,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--dry-run", action="store_true", help="parse and chunk only, no Spark writes"
     )
+    parser.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="rewrite all documents, e.g. after a parsing or chunking change",
+    )
     args = parser.parse_args(argv)
 
     cfg = ProjectConfig.from_yaml(args.config or _find_config(), env=args.env)
@@ -84,7 +89,7 @@ def main(argv: list[str] | None = None) -> None:
             )
         return
 
-    stats = write(get_spark(), cfg, result, max_tokens, overlap)
+    stats = write(get_spark(), cfg, result, max_tokens, overlap, full_refresh=args.full_refresh)
     print(json.dumps({"written": stats}, indent=2))
     if result.errors:
         raise SystemExit(f"{len(result.errors)} file(s) failed to parse; see errors above")
