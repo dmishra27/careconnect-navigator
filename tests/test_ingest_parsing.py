@@ -116,3 +116,14 @@ def test_sentences_ending_in_numbers_are_kept():
         ["You must respond within 20 working days. See section 4.2 of part 3"]
     )
     assert "section 4.2 of part 3" in cleaned[0]
+
+
+def test_wrapped_numbered_sentence_is_not_a_heading():
+    pages = [
+        "2. Handling complaints\n"
+        "1 On receiving a complaint, you must first decide whether the issue can indeed be\n"
+        "defined as a complaint. The person may raise more than one issue."
+    ]
+    sections = pdf_sections(pages, "Procedure")
+    assert [s.heading_path for s in sections] == [["Procedure", "2. Handling complaints"]]
+    assert sections[0].text.startswith("1 On receiving a complaint")
