@@ -15,7 +15,10 @@ the label's evidence phrase, so labels work for any chunk size.
 """
 
 import argparse
+import hashlib
+import json
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -115,14 +118,75 @@ def score(questions: list[Question], rankings: Rankings, ks=KS) -> tuple[dict, l
 # ------------------------------------------------------------------ dense ranking
 
 
-def embed(w, endpoint: str, texts: list[str], batch_size: int = 32) -> np.ndarray:
-    """Embed texts with a Databricks embedding endpoint; rows are L2-normalised."""
-    vectors: list[list[float]] = []
-    for i in range(0, len(texts), batch_size):
-        resp = w.serving_endpoints.query(name=endpoint, input=texts[i : i + batch_size])
-        vectors.extend(item.embedding for item in sorted(resp.data, key=lambda d: d.index))
-    arr = np.asarray(vectors, dtype=np.float32)
-    return arr / np.clip(np.linalg.norm(arr, axis=1, keepdims=True), 1e-12, None)
+CACHE_DIR = Path.home() / ".cache" / "careconnect"
+
+
+class EmbeddingCache:
+    """Embeddings keyed by text hash, saved after every batch so a throttled run can resume.
+
+    Lives outside the repo (in the user's home) so it is never committed.
+    """
+
+    def __init__(self, endpoint: str, cache_dir: Path = CACHE_DIR):
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        self.path = cache_dir / f"embeddings-{endpoint}.jsonl"
+        self.vectors: dict[str, list[float]] = {}
+        if self.path.exists():
+            with open(self.path, encoding="utf-8") as f:
+                for line in f:
+                    rec = json.loads(line)
+                    self.vectors[rec["h"]] = rec["v"]
+
+    @staticmethod
+    def key(text: str) -> str:
+        return hashlib.sha1(text.encode("utf-8")).hexdigest()
+
+    def missing(self, texts: list[str]) -> list[str]:
+        seen, out = set(), []
+        for t in texts:
+            h = self.key(t)
+            if h not in self.vectors and h not in seen:
+                seen.add(h)
+                out.append(t)
+        return out
+
+    def add(self, texts: list[str], vectors: list[list[float]]) -> None:
+        with open(self.path, "a", encoding="utf-8") as f:
+            for t, v in zip(texts, vectors, strict=True):
+                h = self.key(t)
+                self.vectors[h] = v
+                f.write(json.dumps({"h": h, "v": v}) + "\n")
+
+    def get(self, texts: list[str]) -> np.ndarray:
+        arr = np.asarray([self.vectors[self.key(t)] for t in texts], dtype=np.float32)
+        return arr / np.clip(np.linalg.norm(arr, axis=1, keepdims=True), 1e-12, None)
+
+
+def embed(
+    w,
+    endpoint: str,
+    texts: list[str],
+    batch_size: int = 64,
+    pause_s: float = 2.0,
+    cache: EmbeddingCache | None = None,
+) -> np.ndarray:
+    """Embed texts (L2-normalised rows), only calling the endpoint for uncached texts.
+
+    Free Edition rate-limits pay-per-token embedding endpoints, so calls are paced
+    and each batch is cached as soon as it returns.
+    """
+    cache = cache or EmbeddingCache(endpoint)
+    todo = cache.missing(texts)
+    if todo:
+        print(f"  embedding {len(todo)} new texts ({len(texts) - len(todo)} cached)")
+    for n, i in enumerate(range(0, len(todo), batch_size)):
+        if n:
+            time.sleep(pause_s)
+        batch = todo[i : i + batch_size]
+        resp = w.serving_endpoints.query(name=endpoint, input=batch)
+        cache.add(batch, [d.embedding for d in sorted(resp.data, key=lambda d: d.index)])
+        print(f"  {min(i + batch_size, len(todo))}/{len(todo)}")
+    return cache.get(texts)
 
 
 def dense_rankings(
