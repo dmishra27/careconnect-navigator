@@ -50,6 +50,13 @@ RESOURCES = [
         "Geography Codes and Labels: ISD Health Board of Treatment (S27 codes)",
     ),
     Resource(
+        "other_residential",
+        "other_residential_categories.csv",
+        f"{PORTAL}/dataset/65402d20-f0f1-4cee-a4f9-a960ca560444/resource/"
+        "32164b83-c9ec-495a-ac9f-dbeeb6ed5e59/download/other-residential-categories.csv",
+        "Non-standard Geography: Other Residential Categories (RA27 codes)",
+    ),
+    Resource(
         "specialties",
         "specialty_codes.csv",
         f"{PORTAL}/dataset/688c7ea0-4845-4b03-9df0-4149c72cb7f0/resource/"

@@ -56,9 +56,12 @@ def load(reader: SourceReader, folder: str) -> dict[str, tuple[bytes, pd.DataFra
 
 def build(files: dict) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, list[dict]]:
     raw = files["ongoing_waits"][1]
-    isd = files.get("isd_boards")
+    optional = {k: files[k][1] for k in ("isd_boards", "other_residential") if k in files}
     boards = board_lookup(
-        files["health_boards"][1], files["special_boards"][1], isd[1] if isd else None
+        files["health_boards"][1],
+        files["special_boards"][1],
+        optional.get("isd_boards"),
+        optional.get("other_residential"),
     )
     specialties = specialty_lookup(files["specialties"][1])
     silver = to_silver(raw, boards, specialties)

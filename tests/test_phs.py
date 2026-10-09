@@ -121,3 +121,15 @@ def test_windows_1252_lookup_with_non_breaking_space():
     data = "SHB,SHBName,Country\nSB0801,Golden\xa0Jubilee ,S92000003\n".encode("cp1252")
     df = read_csv(data)
     assert df.loc[0, "SHBName"] == "Golden Jubilee"
+
+
+def test_board_lookup_includes_isd_and_residential_codes():
+    names = board_lookup(
+        pd.DataFrame({"HB": ["S08000015"], "HBName": ["NHS Ayrshire"]}),
+        pd.DataFrame({"SHB": ["SB0801"], "SHBName": ["Golden Jubilee"]}),
+        pd.DataFrame({"ISDHBT": ["S27000001"], "ISDHBTName": ["Non-NHS Provider"]}),
+        pd.DataFrame({"CustomResidency": ["RA2704"], "CustomResidencyName": ["Unknown"]}),
+    )
+    assert names["S27000001"] == "Non-NHS Provider"
+    assert names["RA2704"] == "Unknown"
+    assert names["S92000003"] == "Scotland"
