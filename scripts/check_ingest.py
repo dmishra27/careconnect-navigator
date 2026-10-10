@@ -46,3 +46,11 @@ spark.sql(f"""
     FROM {cfg.table("silver_chunks")} WHERE source_type = 'policy'
     GROUP BY doc_id ORDER BY doc_id
 """).show(truncate=False)
+
+print("Tiny policy chunks (under 20 tokens) per document")
+spark.sql(f"""
+    SELECT doc_id, COUNT(*) AS chunks,
+           SUM(CASE WHEN token_count < 20 THEN 1 ELSE 0 END) AS tiny_chunks
+    FROM {cfg.table("silver_chunks")} WHERE source_type = 'policy'
+    GROUP BY doc_id ORDER BY tiny_chunks DESC, doc_id
+""").show(truncate=False)

@@ -14,6 +14,14 @@ _NUMBERED_HEADING = re.compile(r"^(\d{1,2}(\.\d{1,2}){0,2})\.?\s+([A-Z][^.!?]{2,
 _KEYWORD_HEADING = re.compile(r"^(Annex|Appendix|Part|Section|Chapter|Schedule)\s+[\w.]+\b.{0,70}$")
 # contents-page entry: "Appendix 3: Assessment Matrix .. 46" or "1. Introduction ....... 4"
 _TOC_LINE = re.compile(r"(\.\s?){2,}\s*\d{1,3}\s*$")
+# contents entry without dot leaders: a numbered or Annex-style heading ending in a page
+# number, e.g. "4.1 Communication with Patients 7" or "Annex 4 - Exceptions to the TTG 44"
+_TOC_NUMBERED = re.compile(
+    r"^(\d{1,2}(\.\d{1,2}){0,2}\.?|(Annex|Appendix|Part|Section|Chapter|Schedule)\s+[\w.]+)"
+    r"\s+([-\u2013:]\s+)?[A-Za-z(].{2,100}\s\d{1,3}$"
+)
+# document-status watermarks that pypdf extracts as stand-alone lines
+_WATERMARKS = {"DRAFT", "CONFIDENTIAL", "OFFICIAL", "OFFICIAL-SENSITIVE", "SAMPLE"}
 _PAGE_NUMBER = re.compile(r"^\s*(page\s*)?\d{1,3}(\s*(of|/)\s*\d{1,3})?\s*$", re.IGNORECASE)
 
 
@@ -99,6 +107,16 @@ def _is_pdf_heading(line: str) -> bool:
     return 1 <= len(words) <= 8 and line.isupper() and any(c.isalpha() for c in line)
 
 
+def _is_noise_line(line: str) -> bool:
+    """Page numbers, contents-page entries and watermarks: layout, not content."""
+    return bool(
+        _PAGE_NUMBER.match(line)
+        or _TOC_LINE.search(line)
+        or _TOC_NUMBERED.match(line)
+        or line.upper() in _WATERMARKS
+    )
+
+
 def clean_pdf_pages(pages: list[str]) -> list[str]:
     """Remove page numbers and running headers/footers, fix hyphenation."""
     line_counts: Counter[str] = Counter()
@@ -110,11 +128,7 @@ def clean_pdf_pages(pages: list[str]) -> list[str]:
 
     cleaned = []
     for lines in split_pages:
-        kept = [
-            ln
-            for ln in lines
-            if ln and ln not in repeated and not _PAGE_NUMBER.match(ln) and not _TOC_LINE.search(ln)
-        ]
+        kept = [ln for ln in lines if ln and ln not in repeated and not _is_noise_line(ln)]
         text = "\n".join(kept)
         text = re.sub(r"(\w)-\n(\w)", r"\1\2", text)  # re-join hyphenated words
         cleaned.append(text)
