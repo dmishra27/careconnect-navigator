@@ -1,10 +1,15 @@
 """Query the AI Search index over current guidance (ANN by default, see config).
 
 uv run python -m careconnect.search.retriever "How do I complain about my GP?"
+
+Query type AUTO picks HYBRID when the question contains exact terms (digits, acronyms,
+names) and ANN otherwise, because ANN wins on everyday wording and keyword matching wins
+on codes, phone numbers and names (docs/decisions/2026-10-09-retrieval-query-type.md).
 """
 
 import argparse
 import json
+import re
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
@@ -14,6 +19,42 @@ from careconnect.ingest.main import _find_config
 
 RETURN_COLUMNS = ["chunk_id", "doc_id", "title", "section_path", "page", "source_type", "text"]
 DEFAULT_FILTERS = {"status": "current"}  # never surface superseded leaflets
+QUERY_TYPES = ("ANN", "HYBRID", "FULL_TEXT", "AUTO")
+
+# acronyms so common in patient questions that they say nothing about exact matching
+_COMMON_ACRONYMS = {"NHS", "GP", "A&E"}
+_WORD = re.compile(r"[A-Za-z][A-Za-z&-]*")
+
+
+def has_exact_terms(query: str) -> bool:
+    """True when a question carries terms that keyword matching handles better than meaning.
+
+    Signals: any digit (phone numbers, postcodes, form codes, route numbers); an acronym
+    (CHI, BSL, FVRI) other than everyday ones; a capitalised name after the first word
+    (Kilbrannan, Car Park C); a mixed-case token (contactSCOTLAND-BSL).
+    """
+    if re.search(r"\d", query):
+        return True
+    for sentence in re.split(r"[.?!]+\s*", query):
+        words = _WORD.findall(re.sub(r"\bI'\w+", "I", sentence))  # I'm, I've -> I
+        for i, word in enumerate(words):
+            if word in _COMMON_ACRONYMS or word == "I":
+                continue
+            letters = word.replace("-", "").replace("&", "")
+            if len(letters) >= 2 and letters.isupper():
+                return True  # acronym
+            if any(c.isupper() for c in letters[1:]):
+                return True  # mixed case
+            if i > 0 and word[0].isupper():
+                return True  # a name mid-sentence
+    return False
+
+
+def resolve_query_type(query: str, query_type: str) -> str:
+    """Map AUTO to HYBRID or ANN for this query; other types pass through."""
+    if query_type != "AUTO":
+        return query_type
+    return "HYBRID" if has_exact_terms(query) else "ANN"
 
 
 @dataclass
@@ -68,11 +109,12 @@ class Retriever:
         query_type: str | None = None,
     ) -> list[Hit]:
         merged = {**DEFAULT_FILTERS, **(filters or {})}
+        resolved = resolve_query_type(query, query_type or self.cfg.search_query_type)
         response = self.w.vector_search_indexes.query_index(
             index_name=self.cfg.chunks_index,
             columns=RETURN_COLUMNS,
             query_text=query,
-            query_type=query_type or self.cfg.search_query_type,
+            query_type=resolved,
             filters_json=json.dumps(merged),
             num_results=k,
         )
@@ -85,7 +127,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--env", default="dev")
     parser.add_argument("--config", default=None)
     parser.add_argument("-k", type=int, default=5)
-    parser.add_argument("--type", default=None, choices=["HYBRID", "ANN", "FULL_TEXT"])
+    parser.add_argument("--type", default=None, choices=list(QUERY_TYPES))
     parser.add_argument("--source-type", choices=["leaflet", "policy"], default=None)
     args = parser.parse_args(argv)
 

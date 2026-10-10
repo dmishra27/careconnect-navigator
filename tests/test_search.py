@@ -93,3 +93,23 @@ def test_existing_ready_index_is_synced():
     )
     ensure_index(NS(vector_search_indexes=indexes), CFG)
     assert synced == [CFG.chunks_index]
+
+
+def test_has_exact_terms_signals():
+    from careconnect.search.retriever import has_exact_terms
+
+    assert has_exact_terms("Who answers 01632 960 180?")  # digits
+    assert has_exact_terms("Do I need my CHI number?")  # acronym
+    assert has_exact_terms("When is Kilbrannan Village Clinic open?")  # name mid-sentence
+    assert has_exact_terms("Can I use contactSCOTLAND-BSL?")  # mixed case
+    assert not has_exact_terms("How do I complain about my GP?")  # everyday acronym
+    assert not has_exact_terms("I missed it. Do I have to wait again?")  # sentence start
+    assert not has_exact_terms("I've got a cold. Who should I tell?")
+
+
+def test_resolve_query_type():
+    from careconnect.search.retriever import resolve_query_type
+
+    assert resolve_query_type("Where do I bring my HC2 form?", "AUTO") == "HYBRID"
+    assert resolve_query_type("Can I park for free?", "AUTO") == "ANN"
+    assert resolve_query_type("Where do I bring my HC2 form?", "ANN") == "ANN"

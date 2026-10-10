@@ -41,6 +41,24 @@ available through the retriever's `query_type` argument and `--type` on the CLI.
   unchanged (R@1 0.783, R@5 0.891, R@10 0.957, MRR 0.828); HYBRID MRR 0.688; FULL_TEXT
   MRR 0.438. The decision stands.
 
+## Update, 10 October: exact-term questions
+
+The first caveat was tested by adding 15 questions that use the documents' own terms
+(`kind: exact`: CHI, HC2, phone numbers, clinic names, a postcode, a bus route). Same
+index, k=10 (MLflow runs `index-*`, metrics `exact_*` and `paraphrase_*`):
+
+| Query type | Exact R@1 | Exact R@5 | Exact MRR | Paraphrase R@1 | Paraphrase MRR | All 61 MRR |
+|------------|-----------|-----------|-----------|----------------|----------------|------------|
+| ANN        | 0.533     | 0.733     | 0.632     | 0.783          | 0.828          | 0.780      |
+| HYBRID     | 0.600     | 0.933     | 0.713     | 0.609          | 0.688          | 0.694      |
+| FULL_TEXT  | 0.667     | 0.867     | 0.758     | 0.326          | 0.438          | 0.517      |
+
+ANN misses 4 of 15 exact-term questions in the top 5; HYBRID misses 1. ANN still ranks
+best on everyday wording and across all 61 questions. Each method wins on its own kind of
+question, so an `AUTO` query type was added: HYBRID when the question contains digits,
+an acronym other than NHS/GP/A&E, or a capitalised name mid-sentence; ANN otherwise. It
+routes 13 of 15 exact-term and 6 of 46 paraphrased questions to HYBRID. Result pending.
+
 ---
 
 # Chunking: keep 400 tokens with 60 overlap
