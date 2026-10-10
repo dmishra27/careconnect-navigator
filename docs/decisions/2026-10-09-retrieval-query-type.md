@@ -1,7 +1,7 @@
 # Default retrieval query type: ANN
 
 - Date: 2026-10-09
-- Status: accepted (revisit when the question set grows)
+- Status: revised 10 October: AUTO replaces ANN as the default (see update)
 
 ## Context
 
@@ -57,7 +57,30 @@ ANN misses 4 of 15 exact-term questions in the top 5; HYBRID misses 1. ANN still
 best on everyday wording and across all 61 questions. Each method wins on its own kind of
 question, so an `AUTO` query type was added: HYBRID when the question contains digits,
 an acronym other than NHS/GP/A&E, or a capitalised name mid-sentence; ANN otherwise. It
-routes 13 of 15 exact-term and 6 of 46 paraphrased questions to HYBRID. Result pending.
+routes 13 of 15 exact-term and 6 of 46 paraphrased questions to HYBRID.
+
+| Query type | All R@1 | All R@5 | All R@10 | All MRR | Exact R@5 | Paraphrase R@1 | Paraphrase MRR |
+|------------|---------|---------|----------|---------|-----------|----------------|----------------|
+| ANN        | 0.721   | 0.852   | 0.918    | 0.780   | 0.733     | 0.783          | 0.828          |
+| HYBRID     | 0.607   | 0.852   | 0.869    | 0.694   | 0.933     | 0.609          | 0.688          |
+| **AUTO**   | 0.705   | **0.902** | **0.934** | **0.781** | **0.933** | 0.739        | 0.803          |
+
+In question counts (61): AUTO puts the right passage in the top 5 for 55 questions, ANN
+and HYBRID for 52 each. AUTO matches HYBRID on every exact-term question (14 of 15 in the
+top 5) and ANN on everyday questions in the top 5 (41 of 46), but puts the right passage
+first for 2 fewer everyday questions than ANN (34 vs 36): those are among the 6 everyday
+questions that mention a place or a named term and so go to HYBRID.
+
+## Decision (revised 10 October)
+
+Default `search_query_type` is `AUTO`. The agent will read the top 5 passages, and AUTO
+finds the answer there for 3 more questions than either fixed method, with overall
+ranking (MRR) level with ANN. ANN, HYBRID and FULL_TEXT stay available.
+
+Caveats: the routing rules were written after seeing these 61 questions, so the gain may
+be partly fitted to them; re-test on new questions written in Week 3 before trusting it.
+15 exact-term questions is a small set (one question moves exact recall by about 7
+points).
 
 ---
 

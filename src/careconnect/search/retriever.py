@@ -1,4 +1,4 @@
-"""Query the AI Search index over current guidance (ANN by default, see config).
+"""Query the AI Search index over current guidance (AUTO by default, see config).
 
 uv run python -m careconnect.search.retriever "How do I complain about my GP?"
 
