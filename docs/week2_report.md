@@ -427,13 +427,13 @@ What this shows:
 | AI Search index | `silver_chunks_index` | 353 rows, managed embeddings |
 | Job | `[dev dmishra27] careconnect-ingest-dev` | `ingest` → `sync_index`, daily 06:00 (paused) |
 | Job | `[dev dmishra27] careconnect-phs-dev` | Monthly on the 5th, 07:00 (paused) |
-| MLflow experiment | `careconnect-dev` | 6 evaluation runs with per-question tables |
+| MLflow experiment | `careconnect-dev` | 9 evaluation runs with per-question tables (6 on 9 October, 3 re-runs on 10 October) |
 
 ### 8.2 Code and tests
 
 | Item | Value |
 | --- | --- |
-| Python source | 2,121 lines across 4 packages: `ingest`, `search`, `evals`, `phs` |
+| Python source | 2,147 lines across 4 packages: `ingest`, `search`, `evals`, `phs` |
 | Tests | 82 unit tests plus 2 integration tests (up from 3 in Week 1) |
 | Commits | 36 in pull request #2 (73 files changed), plus the clean-up pull request |
 | Decision records | 4 |
