@@ -51,7 +51,7 @@ flowchart TB
     end
 
     subgraph MODEL["ModelOps"]
-        IDX["AI Search Delta Sync index<br/>managed embeddings (gte-large-en), ANN"]
+        IDX["AI Search Delta Sync index<br/>managed embeddings (gte-large-en), AUTO: ANN or hybrid"]
         FC["Forecast model<br/>gold table, MLflow runs, UC registry"]:::planned
     end
 
@@ -94,14 +94,21 @@ flowchart TB
 
 ## Results so far
 
-**Retrieval quality.** 46 patient-style questions, each labelled with the document and an evidence
-phrase that must appear in the retrieved passage. Index of 353 chunks, 10 October 2026:
+**Retrieval quality.** 61 labelled questions: 46 in patients' everyday words and 15 using
+exact terms from the leaflets (CHI, HC2, phone numbers, clinic names). Each is labelled with
+the document and an evidence phrase that must appear in the retrieved passage. Index of 353
+chunks, 10 October 2026:
 
-| Search method | Recall@1 | Recall@5 | Recall@10 | MRR | Document recall@5 |
-| --- | --- | --- | --- | --- | --- |
-| **ANN (vector, default)** | **0.783** | **0.891** | **0.957** | **0.828** | **0.978** |
-| Hybrid | 0.609 | 0.826 | 0.848 | 0.688 | 0.913 |
-| Full text | 0.326 | 0.609 | 0.696 | 0.438 | 0.739 |
+| Search method | Recall@1 | Recall@5 | Recall@10 | MRR | Exact-term recall@5 | Everyday recall@5 |
+| --- | --- | --- | --- | --- | --- | --- |
+| **AUTO (default)** | 0.705 | **0.902** | **0.934** | **0.781** | **0.933** | **0.891** |
+| ANN (vector) | **0.721** | 0.852 | 0.918 | 0.780 | 0.733 | **0.891** |
+| Hybrid | 0.607 | 0.852 | 0.869 | 0.694 | **0.933** | 0.826 |
+| Full text | 0.410 | 0.672 | 0.754 | 0.517 | 0.867 | 0.609 |
+
+Vector search (ANN) handles everyday wording best but misses codes and numbers; keyword
+matching does the reverse. AUTO uses hybrid search when a question contains a number, a code
+or a name, and ANN otherwise, and finds the answer in the top 5 for 55 of 61 questions.
 
 **Chunk size.** 400 tokens with 60 overlap was kept: 800/120 scored the same (MRR 0.788 vs 0.787)
 but sends about 40% more text to the model, and 200/40 scored lower (MRR 0.722).
@@ -110,7 +117,7 @@ but sends about 40% more text to the model, and 200/40 scored lower (MRR 0.722).
 157,191 inpatients were waiting in Scotland (62.8% over 12 weeks) and 496,349 outpatients (50.7% over
 12 weeks).
 
-**Engineering.** 84 unit tests and 2 integration tests, with lint and unit tests run by GitHub Actions on every pull request; two serverless jobs (`ingest_job`,
+**Engineering.** 87 unit tests and 2 integration tests, with lint and unit tests run by GitHub Actions on every pull request; two serverless jobs (`ingest_job`,
 `phs_job`) deployed by the bundle; 4 decision records.
 
 ## Data sources

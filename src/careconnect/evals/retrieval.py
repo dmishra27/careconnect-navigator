@@ -36,7 +36,7 @@ from careconnect.ingest.main import _find_config
 from careconnect.ingest.models import Chunk
 
 KS = (1, 3, 5, 10)
-QUERY_TYPES = ("HYBRID", "ANN", "FULL_TEXT")
+QUERY_TYPES = ("HYBRID", "ANN", "FULL_TEXT", "AUTO")
 DEFAULT_CONFIGS = "400:60,200:40,800:120"
 
 

@@ -66,7 +66,7 @@ def test_search_always_filters_to_current_and_merges_extra_filters():
     client = NS(vector_search_indexes=NS(query_index=query_index))
     Retriever(CFG, client).search("complaint", k=3, filters={"source_type": "policy"})
     assert json.loads(calls["filters_json"]) == {"status": "current", "source_type": "policy"}
-    assert calls["query_type"] == "ANN"  # config default
+    assert calls["query_type"] == "ANN"  # config default AUTO, no exact terms
     assert calls["num_results"] == 3
     assert calls["index_name"] == CFG.chunks_index
 
@@ -93,3 +93,35 @@ def test_existing_ready_index_is_synced():
     )
     ensure_index(NS(vector_search_indexes=indexes), CFG)
     assert synced == [CFG.chunks_index]
+
+
+def test_has_exact_terms_signals():
+    from careconnect.search.retriever import has_exact_terms
+
+    assert has_exact_terms("Who answers 01632 960 180?")  # digits
+    assert has_exact_terms("Do I need my CHI number?")  # acronym
+    assert has_exact_terms("When is Kilbrannan Village Clinic open?")  # name mid-sentence
+    assert has_exact_terms("Can I use contactSCOTLAND-BSL?")  # mixed case
+    assert not has_exact_terms("How do I complain about my GP?")  # everyday acronym
+    assert not has_exact_terms("I missed it. Do I have to wait again?")  # sentence start
+    assert not has_exact_terms("I've got a cold. Who should I tell?")
+
+
+def test_resolve_query_type():
+    from careconnect.search.retriever import resolve_query_type
+
+    assert resolve_query_type("Where do I bring my HC2 form?", "AUTO") == "HYBRID"
+    assert resolve_query_type("Can I park for free?", "AUTO") == "ANN"
+    assert resolve_query_type("Where do I bring my HC2 form?", "ANN") == "ANN"
+
+
+def test_default_auto_sends_exact_terms_to_hybrid():
+    calls = {}
+
+    def query_index(**kwargs):
+        calls.update(kwargs)
+        return _response([])
+
+    client = NS(vector_search_indexes=NS(query_index=query_index))
+    Retriever(CFG, client).search("Where do I bring my HC2 certificate?")
+    assert calls["query_type"] == "HYBRID"
