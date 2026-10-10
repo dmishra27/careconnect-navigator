@@ -11,6 +11,8 @@ from careconnect.evals.retrieval import (
     load_questions,
     normalise,
     score,
+    score_by_kind,
+    with_kind_metrics,
 )
 from careconnect.ingest.pipeline import build
 from careconnect.ingest.sources import SourceReader
@@ -60,6 +62,25 @@ def test_question_ids_are_unique_and_labelled():
     assert len(questions) >= 40
     assert len({q.id for q in questions}) == len(questions)
     assert all(q.relevant for q in questions)
+
+
+def test_score_by_kind_splits_paraphrase_and_exact():
+    qa = Question("a", "?", [Label("d1", "six months")])  # paraphrase by default
+    qb = Question("b", "?", [Label("d1", "six months")], kind="exact")
+    rankings = {"a": [("d1", "six months")], "b": [("x", "no"), ("d1", "six months")]}
+    by_kind = score_by_kind([qa, qb], rankings, ks=(1,))
+    assert by_kind["paraphrase"]["mrr"] == 1.0
+    assert by_kind["exact"]["mrr"] == 0.5
+    combined = with_kind_metrics({"mrr": 0.75}, by_kind)
+    assert combined["mrr"] == 0.75
+    assert combined["exact_mrr"] == 0.5
+    assert combined["exact_n_questions"] == 1
+
+
+def test_question_kinds_are_known():
+    questions = load_questions(QUESTIONS)
+    assert {q.kind for q in questions} <= {"paraphrase", "exact"}
+    assert sum(q.kind == "exact" for q in questions) >= 10
 
 
 def test_every_leaflet_label_has_evidence_in_its_leaflet():
