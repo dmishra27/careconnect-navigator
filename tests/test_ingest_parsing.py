@@ -127,3 +127,36 @@ def test_wrapped_numbered_sentence_is_not_a_heading():
     sections = pdf_sections(pages, "Procedure")
     assert [s.heading_path for s in sections] == [["Procedure", "2. Handling complaints"]]
     assert sections[0].text.startswith("1 On receiving a complaint")
+
+
+def test_contents_entries_without_dot_leaders_are_dropped():
+    pages = [
+        "Contents\n4.1 Communication with Patients 7\n"
+        "12.2 New Inpatient/Day Case Patients (Treatment Time Guarantee) 31\n"
+        "Annex 4 - Exceptions to the Treatment Time Guarantee 44\nDRAFT",
+        "4. Communication\nPatients must be told about their waiting time.",
+    ]
+    cleaned = clean_pdf_pages(pages)
+    assert "Communication with Patients 7" not in cleaned[0]
+    assert "Guarantee) 31" not in cleaned[0]
+    assert "Guarantee 44" not in cleaned[0]
+    assert "DRAFT" not in cleaned[0]
+
+
+def test_real_headings_and_numbered_sentences_are_kept():
+    pages = [
+        "Annex 4 - Exceptions to the Treatment Time Guarantee\n"
+        "4.1 Communication with Patients\n"
+        "8 Treatment time guarantee\n"
+        "Patients should be treated within 12 weeks of agreeing to treatment in 2012\n"
+        "Section 3"
+    ]
+    cleaned = clean_pdf_pages(pages)[0]
+    for line in [
+        "Annex 4 - Exceptions to the Treatment Time Guarantee",
+        "4.1 Communication with Patients",
+        "8 Treatment time guarantee",
+        "Patients should be treated within 12 weeks of agreeing to treatment in 2012",
+        "Section 3",
+    ]:
+        assert line in cleaned

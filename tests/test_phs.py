@@ -133,3 +133,32 @@ def test_board_lookup_includes_isd_and_residential_codes():
     assert names["S27000001"] == "Non-NHS Provider"
     assert names["RA2704"] == "Unknown"
     assert names["S92000003"] == "Scotland"
+
+
+def test_fetch_retries_when_the_portal_drops_the_connection(monkeypatch):
+    import http.client
+
+    from careconnect.phs import sources
+
+    calls = []
+
+    class Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b"ok"
+
+    def urlopen(req, timeout):
+        calls.append(1)
+        if len(calls) < 3:
+            raise http.client.RemoteDisconnected("closed")
+        return Resp()
+
+    monkeypatch.setattr(sources.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(sources.time, "sleep", lambda s: None)
+    assert sources.fetch("https://example.org/x.csv") == b"ok"
+    assert len(calls) == 3

@@ -6,6 +6,8 @@ the same each month (the direct download file name changes with every release).
 """
 
 import hashlib
+import http.client
+import time
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -78,10 +80,20 @@ def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def fetch(url: str, timeout: int = 120) -> bytes:
+def fetch(url: str, timeout: int = 120, attempts: int = 4, wait_s: float = 10) -> bytes:
+    """Download a URL, retrying when the portal drops the connection or times out."""
     req = urllib.request.Request(url, headers={"User-Agent": "careconnect-navigator/0.1"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read()
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.read()
+        except (OSError, http.client.HTTPException) as exc:  # URLError is an OSError
+            if attempt == attempts:
+                raise
+            delay = wait_s * attempt
+            print(f"    {type(exc).__name__}: {exc}; retrying in {delay:.0f}s ({attempt})")
+            time.sleep(delay)
+    raise AssertionError("unreachable")
 
 
 def download(dest: Path) -> list[dict]:
