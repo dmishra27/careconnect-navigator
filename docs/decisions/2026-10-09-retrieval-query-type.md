@@ -37,6 +37,9 @@ available through the retriever's `query_type` argument and `--type` on the CLI.
   matching helps. Add such questions before revisiting.
 - 46 questions is small: one question moves a recall figure by about 2 points.
 - A reranker on top of HYBRID was not tested.
+- Re-run on 10 October after removing contents-page chunks (357 to 353 chunks): ANN
+  unchanged (R@1 0.783, R@5 0.891, R@10 0.957, MRR 0.828); HYBRID MRR 0.688; FULL_TEXT
+  MRR 0.438. The decision stands.
 
 ---
 

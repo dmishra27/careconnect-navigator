@@ -9,12 +9,12 @@ knowledge base (LLMOps track) and starts the waiting-times data pipeline (MLOps 
 | Area | Result |
 |------|--------|
 | Sources | 21 current and 1 superseded synthetic leaflets, 6 public Scottish Government PDFs |
-| Ingest | `bronze_documents` (28 docs), `silver_chunks` (357 chunks, Change Data Feed on), `ops_pii_quarantine` (empty) |
+| Ingest | `bronze_documents` (28 docs), `silver_chunks` (353 chunks, Change Data Feed on), `ops_pii_quarantine` (empty) |
 | Search | AI Search endpoint `careconnect-search`, Delta Sync index `silver_chunks_index`, managed embeddings (`databricks-gte-large-en`) |
 | Retrieval quality | ANN search: recall@5 0.891, recall@10 0.957, MRR 0.828 on 46 labelled questions |
 | PHS waiting times | `silver_phs_ongoing_waits`: 145,789 rows, Oct 2012 to Jun 2026, 0 rejected, all checks logged to `ops_dq_results` |
 | Jobs | `ingest_job` (ingest, then index sync) and `phs_job`, both serverless, deployed with the bundle |
-| Tests | 79 unit tests, plus 2 integration tests against Databricks |
+| Tests | 82 unit tests, plus 2 integration tests against Databricks |
 
 ## Open items from Week 1 (closed)
 
@@ -106,11 +106,22 @@ All in `docs/decisions/`:
 | Chunks went over the 400-token budget, and some PDF chunks had 1 token | Measure the joined chunk instead of summing units; trim overlap; merge PDF sections under 4 words |
 | Every PDF chunk said page 1 | Inline page markers, chunk page = page of its first unit |
 | Contents-page lines and wrapped sentences became section headings | Drop dot-leader contents lines; reject a heading followed by a lowercase line |
+| Contents entries without dot leaders and a "DRAFT" watermark became tiny chunks (found on 10 October) | Drop numbered lines ending in a page number and stand-alone watermarks |
+| PHS portal dropped a download connection | Downloads retry up to 4 times |
 | AI Search index took about 24 minutes the first time | Normal for a new endpoint; re-runs wait instead of re-syncing a building index |
 | Embedding endpoint rate-limited direct calls | Cached, paced embeddings; chunking comparison run with a local model |
 | PHS lookup file was not UTF-8 | Fall back to Windows-1252 and normalise non-breaking spaces |
 | 5,401 rows with unnamed board codes | Added the ISD board-of-treatment and RA27 residential-category lookups |
 | PHS job could not resolve opendata.nhs.scot | Free Edition serverless has no internet: download locally, job loads from the Volume |
+
+## Review and clean-up (10 October)
+
+All figures were checked in Databricks. The check found 13 policy chunks under 20 tokens:
+9 in the Waiting Times Guidance (contents entries without dot leaders and a "DRAFT"
+watermark) and 4 genuine one-line sections of the Patient Rights Act. After the fix:
+353 chunks (was 357), 4 tiny chunks left in the Guidance. ANN scores are unchanged
+(R@5 0.891, R@10 0.957, MRR 0.828); hybrid MRR 0.682 to 0.688, full-text MRR 0.473 to
+0.438. The full report is `docs/week2_report.md`.
 
 ## How to run
 
