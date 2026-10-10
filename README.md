@@ -1,5 +1,7 @@
 # CareConnect Navigator
 
+[![CI](https://github.com/dmishra27/careconnect-navigator/actions/workflows/ci.yml/badge.svg)](https://github.com/dmishra27/careconnect-navigator/actions/workflows/ci.yml)
+
 A healthcare LLMOps and MLOps portfolio project on Databricks. It builds an assistant that answers
 patients' questions about NHS hospital services, grounded in service leaflets and Scottish
 Government policy, with the source and page cited for every answer. A second track turns Public
@@ -108,7 +110,7 @@ but sends about 40% more text to the model, and 200/40 scored lower (MRR 0.722).
 157,191 inpatients were waiting in Scotland (62.8% over 12 weeks) and 496,349 outpatients (50.7% over
 12 weeks).
 
-**Engineering.** 82 unit tests and 2 integration tests; two serverless jobs (`ingest_job`,
+**Engineering.** 84 unit tests and 2 integration tests, with lint and unit tests run by GitHub Actions on every pull request; two serverless jobs (`ingest_job`,
 `phs_job`) deployed by the bundle; 4 decision records.
 
 ## Data sources

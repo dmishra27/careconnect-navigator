@@ -3,7 +3,10 @@
 # A retrieved chunk counts as relevant when its doc_id matches a label AND its text
 # contains that label's evidence phrase (case, markdown and whitespace ignored).
 # Labels never name chunk ids, so the same set scores any chunking config.
-# Questions are paraphrased on purpose: they should not just repeat the leaflet wording.
+# Questions q01-q46 are paraphrased on purpose: they should not just repeat the leaflet
+# wording. Questions marked `kind: exact` use the exact terms a patient might copy from a
+# letter (CHI number, HC2, phone numbers, clinic names, postcodes) to test keyword matching.
+# Questions without a kind count as `paraphrase`.
 
 questions:
   # ---------------------------------------------------------------- complaints
@@ -212,3 +215,80 @@ questions:
     question: How long until I get the results of my scan?
     relevant:
       - {doc_id: fvhb-21, evidence: "scan reports usually take 1 to 3 weeks"}
+
+  # ------------------------------------------------- exact terms (kind: exact)
+  - id: q47
+    kind: exact
+    question: Do I need my CHI number when I phone about my appointment?
+    relevant:
+      - {doc_id: fvhb-02, evidence: "CHI number if you know it"}
+  - id: q48
+    kind: exact
+    question: What should I do with my HC2 certificate to claim travel costs?
+    relevant:
+      - {doc_id: fvhb-08, evidence: "HC2 certificate to your appointment"}
+  - id: q49
+    kind: exact
+    question: Who answers 01632 960 180?
+    relevant:
+      - {doc_id: fvhb-16, evidence: "Complaints Team on 01632 960 180"}
+  - id: q50
+    kind: exact
+    question: What is the phone number 01632 960 140 for?
+    relevant:
+      - {doc_id: fvhb-08, evidence: "Phone 01632 960 140"}
+  - id: q51
+    kind: exact
+    question: Can I change my appointment twice?
+    relevant:
+      - {doc_id: fvhb-02, evidence: "change your appointment once"}
+  - id: q52
+    kind: exact
+    question: When is Kilbrannan Village Clinic open?
+    relevant:
+      - {doc_id: fvhb-05, evidence: "Tuesday and Thursday 9am to 1pm"}
+  - id: q53
+    kind: exact
+    question: What services does Muirhead Clinic offer?
+    relevant:
+      - {doc_id: fvhb-05, evidence: "Podiatry and physiotherapy"}
+  - id: q54
+    kind: exact
+    question: Does Grangeford Community Clinic have a late clinic?
+    relevant:
+      - {doc_id: fvhb-05, evidence: "Tuesday late clinic until 7pm"}
+  - id: q55
+    kind: exact
+    question: Can I use contactSCOTLAND-BSL to reach the hospital?
+    relevant:
+      - {doc_id: fvhb-09, evidence: "contactSCOTLAND-BSL"}
+  - id: q56
+    kind: exact
+    question: How do I make a subject access request?
+    relevant:
+      - {doc_id: fvhb-19, evidence: "Complete the access request form"}
+  - id: q57
+    kind: exact
+    question: Which hospital has the postcode FV3 2LP?
+    relevant:
+      - {doc_id: fvhb-04, evidence: "Carron Way, Grangeford FV3 2LP"}
+  - id: q58
+    kind: exact
+    question: How many Blue Badge spaces are there at Carronside General Hospital?
+    relevant:
+      - {doc_id: fvhb-06, evidence: "15 accessible spaces"}
+  - id: q59
+    kind: exact
+    question: Does Route 44 go to Carronside General Hospital?
+    relevant:
+      - {doc_id: fvhb-07, evidence: "Route 44 runs hourly"}
+  - id: q60
+    kind: exact
+    question: Who is Car Park C at FVRI for?
+    relevant:
+      - {doc_id: fvhb-06, evidence: "Car Park C for outpatients"}
+  - id: q61
+    kind: exact
+    question: What is the Breathing Space phone number?
+    relevant:
+      - {doc_id: fvhb-20, evidence: "Breathing Space: 0800 83 85 87"}

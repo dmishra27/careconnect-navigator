@@ -51,6 +51,7 @@ class Question:
     id: str
     question: str
     relevant: list[Label]
+    kind: str = "paraphrase"  # "exact": uses the document's own terms
 
 
 # (doc_id, text) pairs in rank order, per question id
@@ -68,7 +69,12 @@ def load_questions(path: str | Path) -> list[Question]:
     with open(path, encoding="utf-8") as f:
         raw = yaml.safe_load(f)
     return [
-        Question(q["id"], q["question"], [Label(**r) for r in q["relevant"]])
+        Question(
+            q["id"],
+            q["question"],
+            [Label(**r) for r in q["relevant"]],
+            q.get("kind", "paraphrase"),
+        )
         for q in raw["questions"]
     ]
 
@@ -101,6 +107,7 @@ def score(questions: list[Question], rankings: Rankings, ks=KS) -> tuple[dict, l
         rows.append(
             {
                 "id": q.id,
+                "kind": q.kind,
                 "question": q.question,
                 "first_relevant_rank": rank,
                 "doc_hit_at_5": any(d in label_docs for d, _ in ranked[:5]),
@@ -119,6 +126,22 @@ def score(questions: list[Question], rankings: Rankings, ks=KS) -> tuple[dict, l
     metrics["doc_recall_at_5"] = sum(r["doc_hit_at_5"] for r in rows) / n
     metrics["n_questions"] = len(rows)
     return metrics, rows
+
+
+def score_by_kind(questions: list[Question], rankings: Rankings, ks=KS) -> dict[str, dict]:
+    """The same metrics for each question kind (paraphrase, exact), keyed by kind."""
+    kinds = sorted({q.kind for q in questions})
+    return {
+        kind: score([q for q in questions if q.kind == kind], rankings, ks)[0] for kind in kinds
+    }
+
+
+def with_kind_metrics(metrics: dict, by_kind: dict[str, dict]) -> dict:
+    """Overall metrics plus per-kind ones prefixed with the kind, e.g. ``exact_mrr``."""
+    out = dict(metrics)
+    for kind, m in by_kind.items():
+        out.update({f"{kind}_{name}": value for name, value in m.items()})
+    return out
 
 
 # ------------------------------------------------------------------ dense ranking
@@ -334,9 +357,9 @@ def _print_table(title: str, results: list[tuple[str, dict]]):
         c for c in ("n_chunks", "median_chunk_tokens", "mean_tokens_top5") if c in results[0][1]
     ]
     print(f"\n{title}")
-    print(f"{'run':<22}" + "".join(f"{c.replace('recall_at_', 'R@'):>10}" for c in cols + extra))
+    print(f"{'run':<30}" + "".join(f"{c.replace('recall_at_', 'R@'):>10}" for c in cols + extra))
     for name, m in results:
-        print(f"{name:<22}" + "".join(f"{m[c]:>10.3f}" for c in cols + extra))
+        print(f"{name:<30}" + "".join(f"{m[c]:>10.3f}" for c in cols + extra))
 
 
 def _find_questions() -> Path:
@@ -381,10 +404,16 @@ def main(argv: list[str] | None = None) -> None:
     experiment = experiment_path(w, cfg.experiment_name)
 
     if args.mode in ("index", "all"):
-        results = []
+        results, kind_results = [], []
         for qt in QUERY_TYPES:
-            metrics, rows = score(questions, run_index(cfg, questions, args.k, qt))
+            rankings = run_index(cfg, questions, args.k, qt)
+            metrics, rows = score(questions, rankings)
+            by_kind = score_by_kind(questions, rankings)
             results.append((qt, metrics))
+            kind_results += [
+                (f"{qt} {kind} (n={m['n_questions']})", m) for kind, m in by_kind.items()
+            ]
+            metrics = with_kind_metrics(metrics, by_kind)
             if not args.no_mlflow:
                 params = {
                     "experiment": "index",
@@ -395,6 +424,8 @@ def main(argv: list[str] | None = None) -> None:
                 }
                 log_run(experiment, f"index-{qt.lower()}", params, metrics, rows)
         _print_table("Live AI Search index (query types)", results)
+        if len({q.kind for q in questions}) > 1:
+            _print_table("By question kind", sorted(kind_results, key=lambda r: r[0].split()[1]))
 
     if args.mode in ("chunks", "all"):
         if args.embedder == "local":
@@ -410,6 +441,7 @@ def main(argv: list[str] | None = None) -> None:
             chunks = build(reader, max_t, overlap).chunks
             rankings, stats = run_chunk_config(embedder, cfg, questions, chunks, q_vecs, args.k)
             metrics, rows = score(questions, rankings)
+            metrics = with_kind_metrics(metrics, score_by_kind(questions, rankings))
             metrics.update(stats)
             results.append((f"dense {max_t}/{overlap}", metrics))
             if not args.no_mlflow:
