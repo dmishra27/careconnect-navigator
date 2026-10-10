@@ -16,6 +16,8 @@ In plain terms, Week 2 did three things:
 - **Built a search engine over the library and measured how good it is.** An AI Search index finds the right passage for a patient's question. On 46 test questions it puts the right passage in the top 5 results 89% of the time and in the top 10 results 96% of the time. Two settings were chosen from evidence, not guesswork: the search method and the chunk size.
 - **Started the numbers side of the project.** 145,789 rows of official Public Health Scotland waiting-times statistics (October 2012 to June 2026) were loaded and cleaned, with automatic data-quality checks recorded every run. This data feeds the forecasting work in later weeks.
 
+Section 8 logs all 13 experiments with their numbers and conclusions, and section 9 sets out what the waiting-times data shows: in June 2026, 62.8% of inpatient and day-case waits in Scotland were over 12 weeks.
+
 Everything runs as scheduled jobs on Databricks serverless compute, defined in the bundle, tested by 82 automated tests, and merged to `main` through pull request #2 and a follow-up clean-up pull request. All eight open items carried over from Week 1 are closed.
 
 ## 2. How Week 2 continues from Week 1
@@ -408,9 +410,202 @@ What this shows:
 - **Keyword search lost a little.** The contents lines repeated section titles word for word ("Treatment Time Guarantee 31"), which happened to help keyword matching. That reinforces the decision to use ANN.
 - The PHS download also gained automatic retries after the portal dropped a connection once.
 
-## 8. Results at a glance
+## 8. Experiment log
 
-### 8.1 Databricks objects (dev environment)
+Every experiment run during Week 2, in the order it happened, each in the same shape: the question it answered, how it was run, what came out (with the actual numbers) and what was concluded. All figures come from the run outputs and from MLflow.
+
+### E1. Do chunks stay within the 400-token budget?
+
+- **Question:** does the chunker respect its limits on real documents?
+- **Setup:** dry run of the ingest pipeline over all 28 documents (`uv run ingest --dry-run`).
+- **Result:** 386 chunks, but the largest was 416 tokens (over budget) and the smallest was 1 token. Token counts had been added up piece by piece, which undercounts the joined chunk, and stray lines between PDF headings became one-word chunks.
+- **Change:** measure the joined chunk instead of summing pieces, trim the carried-over overlap when needed, and merge PDF sections of under 4 words into the next section.
+- **Re-run:** 374 chunks, smallest 5 tokens, largest exactly 400.
+- **Conclusion:** unit tests on invented text had passed; only real documents exposed the problem. Limits must be tested on the real corpus.
+
+### E2. Does the load skip unchanged files?
+
+- **Question:** is the pipeline safe to run every day?
+- **Setup:** full load, then the same command again with no file changes.
+- **Result:** first run wrote 28 documents and 374 chunks; second run changed 0 documents. The same held later inside the Databricks job (28 unchanged, 0 chunks written).
+- **Conclusion:** file fingerprints work; daily scheduled runs cost almost nothing when nothing changes.
+
+### E3. Do PDF chunks get the right page number?
+
+- **Question:** can an answer cite the page a passage comes from?
+- **Setup:** count distinct pages per policy document in `silver_chunks`.
+- **Result before:** every chunk of the Charter showed page 1, because a chunk took the page where its section began.
+- **Change:** an invisible page marker is placed wherever a section runs onto a new page; each chunk takes the page of its first sentence.
+- **Result after:**
+
+| Document | Chunks | Distinct pages | Page range |
+| --- | --- | --- | --- |
+| Charter of Patient Rights | 40 | 26 | 1 to 29 |
+| NHS Model Complaints Procedure | 87 | 55 | 1 to 62 |
+| Waiting Times Guidance | 80 | 43 | 1 to 49 |
+| Patient Rights (Scotland) Act | 43 | 16 | 1 to 16 |
+| DL(2023)32 | 16 | 6 | 1 to 7 |
+| Waiting for NHS Treatment | 3 | 2 | 1 to 2 |
+
+- **Conclusion:** citations like "see page 7" are now possible. Chunk counts moved from 374 to 375 because a page break became a valid split point.
+
+### E4. Do the first searches return sensible results?
+
+- **Question:** before measuring anything, does the index answer real questions?
+- **Setup:** three searches with the first retriever (hybrid at that time) over 375 chunks.
+- **Result:**
+
+| Question | What came back | Verdict |
+| --- | --- | --- |
+| "How do I make a complaint and how long do I have?" | Charter (pages 22 and 23), the complaints procedure labelled "Appendix 3 ... 46", and the leaflet's "How we handle complaints" at rank 4. The leaflet's "Time limits" section did not appear. | Partly right; exposed a contents-page heading and a missed section |
+| "What is the 12 week treatment time guarantee?" (policies only) | Waiting Times Guidance pages 4, 41 and 44; the Act, sections 8 and 9 | All five relevant, with pages |
+| "Can I change my appointment online?" | Current booking leaflet first; superseded edition never shown; two unrelated Charter passages at ranks 2 and 4 | Right answer first; filter works |
+
+- **Conclusion:** search worked, but looking at results by eye found two problems the counts had hidden (contents-page headings, a missed short section). That motivated the cleaning work in E5 and the measured evaluation in E7.
+
+### E5. How much did each PDF cleaning rule change the chunks?
+
+- **Question:** which cleaning rules matter, and by how much?
+- **Setup:** re-ingest after each rule; compare chunk counts, median size and the labels search returns.
+- **Result:**
+
+| Step | Rule added | Chunks | Median tokens | Effect seen in search |
+| --- | --- | --- | --- | --- |
+| Start | Budget fix and fragment merge (E1) | 374 | not recorded | – |
+| +page markers | Page breaks become split points (E3) | 375 | 155 | – |
+| +dot-leader contents | Drop lines like "Appendix 3 ... 46" | 373 | 155 | "Appendix 3 ... 46" label gone, replaced by "1 On receiving a complaint, you must first decide whether the issue can indeed be" |
+| +wrapped sentences | A "heading" followed by a lowercase line is part of a sentence | 357 | 209 | That half-sentence label gone; the procedure's text keeps its real section |
+| +contents without dots, watermarks (10 October) | Drop "4.1 Communication with Patients 7" and "DRAFT" | 353 | 213 | Tiny Guidance chunks 9 to 4 (see section 7.9) |
+
+- **Conclusion:** the biggest single change was the wrapped-sentence rule: false headings had been cutting sections into small pieces, and fixing it removed 16 chunks and raised the median from 155 to 209 tokens. Cleaning rules for PDF structure mattered more than any chunk-size setting.
+
+### E6. How long does the search index take to build and refresh?
+
+- **Question:** what does keeping the index in sync cost in time?
+- **Setup:** time each `build-index` run from start to "ready".
+- **Result:**
+
+| Run | Change in the table | Time to ready |
+| --- | --- | --- |
+| First build (new endpoint) | 375 rows added | about 24 minutes (16 waiting for the endpoint's machine, 8 indexing) |
+| Refresh after dot-leader rule | 375 to 373 | about 4.5 minutes |
+| Refresh after wrapped-sentence rule | 373 to 357 | about 8 minutes |
+| Refresh in the ingest job | no changes | under a minute |
+| Refresh after 10 October clean-up | 357 to 353 | about 10 minutes |
+
+- **Conclusion:** the first build is slow because the endpoint starts up; refreshes take minutes and scale with the amount of change, including deletions. A triggered refresh after each ingest is the right fit for Free Edition.
+
+### E7. Which search method finds the right passage most often?
+
+- **Question:** ANN (meaning), full text (keywords) or hybrid (both)?
+- **Setup:** 46 labelled questions against the live index (357 chunks), top 10 results each, all three methods; logged to MLflow as `index-*`.
+- **Result:**
+
+| Method | R@1 | R@3 | R@5 | R@10 | MRR | Right document in top 5 |
+| --- | --- | --- | --- | --- | --- | --- |
+| ANN | 0.783 | 0.826 | 0.891 | 0.957 | 0.828 | 0.978 |
+| Hybrid | 0.587 | 0.783 | 0.826 | 0.848 | 0.682 | 0.913 |
+| Full text | 0.370 | 0.565 | 0.609 | 0.717 | 0.473 | 0.717 |
+
+- **Conclusion:** ANN puts the right passage first for 36 of 46 questions, against 27 for hybrid, and finds the right document in the top 5 for 45 of 46. Merging in keyword results lets long policy passages full of matching words push short, precise leaflet sections down. ANN became the default (decision record). Caveat: questions were deliberately written in patients' own words, which favours meaning-based search.
+
+### E8. Can the chunk-size comparison use the index's own embedding model?
+
+- **Question:** can chunk sets be embedded directly with `databricks-gte-large-en`?
+- **Setup:** call the embedding endpoint directly for 46 questions and about 1,200 chunk texts.
+- **Result:** refused with "Exceeded workspace QPS rate limit" even for the first 46 texts, after the SDK's 5 minutes of retries; slower pacing did not help.
+- **Change:** run the comparison with an open model on the laptop (`BAAI/bge-base-en-v1.5`), the same model for every chunk size, with embeddings cached to disk.
+- **Check:** with 400/60 chunks the laptop model reached the same R@5 as the live index (0.891), with a slightly lower MRR (0.787 against 0.828).
+- **Conclusion:** Free Edition throttles direct embedding calls; a local model is a fair way to compare chunk sizes against each other, though not to compare against the index.
+
+### E9. Which chunk size works best?
+
+- **Question:** small (200/40), medium (400/60) or large (800/120) chunks?
+- **Setup:** rebuild chunks at each size from the Volume, embed with the laptop model, rank by similarity, same 46 questions; logged as `chunks-*`.
+- **Result:**
+
+| Size / overlap | Chunks | R@1 | R@3 | R@5 | R@10 | MRR | Right document in top 5 | Tokens in top 5 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 200 / 40 | 561 | 0.630 | 0.761 | 0.848 | 0.913 | 0.722 | 0.935 | 604 |
+| 400 / 60 | 355 | 0.717 | 0.826 | 0.891 | 0.935 | 0.787 | 0.957 | 909 |
+| 800 / 120 | 277 | 0.717 | 0.826 | 0.891 | 0.935 | 0.788 | 0.935 | 1,286 |
+
+- **Conclusion:** 800/120 finds nothing extra but sends about 40% more text to the LLM per answer and finds the right document slightly less often; 200/40 is cheapest but misses the top result for 4 more questions. 400/60 kept. The median chunk size (212, 164, 95) is not a useful comparison: leaflet sections are short at any setting, so the distribution has two groups.
+
+### E10. What do individual questions show?
+
+- **Question:** where does search fail, and why?
+- **Setup:** the per-question table attached to each MLflow run (`per_question.json`): rank of the first correct passage, and whether the right document was in the top 5.
+- **Result (examples from the 800/120 run):**
+
+| Question | First correct rank | Right document in top 5 | Reading |
+| --- | --- | --- | --- |
+| q01 "Is there a deadline for raising a complaint...?" | not in top 10 | no | Long complaints-procedure passages crowd out the leaflet's short "Time limits" section |
+| q35 "Is there an independent service...?" | not in top 10 | yes | Right leaflet found, but not the passage with the evidence |
+| q02 "How long does a full investigation take?" | 2 | yes | Close miss |
+| q07 "If my child misses a hospital appointment...?" | 2 | yes | Close miss |
+
+- **Conclusion:** the q01 failure is the same weakness first seen by eye in E4, now measured. Questions that fail under every setting point to content or labelling gaps rather than search settings; these are the starting point for Week 3.
+
+### E11. Do the PHS lookups name every code?
+
+- **Question:** does every board and specialty code in the waiting-times file have a name?
+- **Setup:** dry runs of the PHS pipeline, adding lookups until the `known_board` check passed.
+- **Result:**
+
+| Run | Change | Rows with an unnamed board code |
+| --- | --- | --- |
+| 1 | Health board and special board lookups | failed to read: a lookup file was Windows-1252, not UTF-8 |
+| 2 | Encoding fallback added | 5,401 |
+| 3 | + ISD health board of treatment lookup | 1,813 (codes RA2704: 1,617; RA2702: 196) |
+| 4 | + Other residential categories lookup | 0 |
+
+- **Also found:** 72 rows with a blank specialty (NHS Greater Glasgow and Clyde patients under several specialties, as the PHS dictionary explains) and 10 rows with specialty `H3`, missing from the current lookup.
+- **Conclusion:** the warning-level checks did their job: each one pointed to the next missing lookup, and no row had to be removed.
+
+### E12. Can a Databricks job download from the internet?
+
+- **Question:** can the monthly PHS job fetch new files itself?
+- **Setup:** run `phs_job` on serverless compute with the download switched on.
+- **Result:** failed after about 90 seconds with "Temporary failure in name resolution": the job could not even look up opendata.nhs.scot. Without the download, the job succeeded in 1 minute 4 seconds and correctly skipped an unchanged file.
+- **Conclusion:** Free Edition serverless compute has no internet access. Files are downloaded on the laptop and the job loads from the Volume (decision record). A later laptop download also met a dropped connection from the portal, so downloads now retry automatically.
+
+### E13. Does every figure in this report match Databricks?
+
+- **Question:** are the report's claims true in the workspace itself?
+- **Setup:** on 10 October, each summary claim was checked in the SQL editor, the Jobs pages and the MLflow experiment.
+- **Result:** every figure matched: 28 documents (21 current leaflets, 1 superseded, 6 policies), 0 quarantined, 106 leaflet and 251 policy chunks with a maximum of 400 tokens, 145,789 waiting-times rows from October 2012 to June 2026, 11 data-quality results with 0 rejected rows, both jobs successful, and the evaluation scores in MLflow. The check also found 13 policy chunks under 20 tokens, fixed in section 7.9.
+- **Conclusion:** checking outputs against the source, not only running tests, found the one remaining cleaning gap.
+
+## 9. What the waiting-times data shows
+
+The PHS series is the input for forecasting in later weeks, but it already gives a clear picture of the current position. Scotland-wide, all specialties:
+
+| Month | Patient type | Waiting | Over 12 weeks | Share over 12 weeks | Median wait (days) |
+| --- | --- | --- | --- | --- | --- |
+| April 2026 | Inpatient/Day case | 157,169 | 96,441 | 61.4% | 128 |
+| May 2026 | Inpatient/Day case | 157,293 | 98,829 | 62.8% | 125 |
+| June 2026 | Inpatient/Day case | 157,191 | 98,657 | 62.8% | 130 |
+| April 2026 | New Outpatient | 489,120 | 248,666 | 50.8% | 86 |
+| May 2026 | New Outpatient | 495,813 | 254,254 | 51.3% | 88 |
+| June 2026 | New Outpatient | 496,349 | 251,503 | 50.7% | 89 |
+
+What it shows:
+
+- **About 653,000 waits were ongoing in June 2026:** 157,191 for inpatient or day-case treatment and 496,349 for a first outpatient appointment.
+- **Most inpatient waits are past the 12-week mark.** 62.8% of inpatient and day-case waits were over 12 weeks, the Treatment Time Guarantee set out in the Patient Rights (Scotland) Act. Just over half of outpatient waits (50.7%) were over the 12-week standard.
+- **The typical wait is long.** The median ongoing inpatient wait was 130 days (about 19 weeks); for outpatients, 89 days (about 13 weeks).
+- **The three months shown are stable.** Totals moved by under 2%, so there is no sign of a sudden change in this short window.
+
+How to read it:
+
+- These are counts of people still waiting at the end of each month (ongoing waits), as published by PHS. The pipeline types and checks them but does not change them.
+- Three months show a level, not a trend. The full series runs back to October 2012 (165 months, 330 Scotland-level rows), which is what the forecasting work will use.
+- The data links the two halves of the project: the knowledge base explains the rules (the 12-week guarantee and standard), and this table shows how the system is doing against them.
+
+## 10. Results at a glance
+
+### 10.1 Databricks objects (dev environment)
 
 | Object | Name | Contents |
 | --- | --- | --- |
@@ -429,7 +624,7 @@ What this shows:
 | Job | `[dev dmishra27] careconnect-phs-dev` | Monthly on the 5th, 07:00 (paused) |
 | MLflow experiment | `careconnect-dev` | 9 evaluation runs with per-question tables (6 on 9 October, 3 re-runs on 10 October) |
 
-### 8.2 Code and tests
+### 10.2 Code and tests
 
 | Item | Value |
 | --- | --- |
@@ -438,9 +633,9 @@ What this shows:
 | Commits | 36 in pull request #2 (73 files changed), plus the clean-up pull request |
 | Decision records | 4 |
 
-## 9. Tech stack
+## 11. Tech stack
 
-### 9.1 On the laptop
+### 11.1 On the laptop
 
 | Tool | Version | Role |
 | --- | --- | --- |
@@ -455,7 +650,7 @@ What this shows:
 | pytest | 8.3.5 | Unit and integration tests |
 | hatchling | | Builds the project's Python package (wheel) |
 
-### 9.2 Python libraries
+### 11.2 Python libraries
 
 | Library | Version | Used for |
 | --- | --- | --- |
@@ -470,7 +665,7 @@ What this shows:
 | openai, databricks-openai | 2.14.0, 0.6.1 | Calling Databricks-hosted LLMs (from Week 1) |
 | sentence-transformers | | Local embedding model for the chunk-size evaluation only (`BAAI/bge-base-en-v1.5`) |
 
-### 9.3 Databricks platform
+### 11.3 Databricks platform
 
 | Service | Role in the project |
 | --- | --- |
@@ -485,7 +680,7 @@ What this shows:
 | MLflow on Databricks | Experiment `careconnect-dev` with evaluation runs |
 | SQL editor | Spot-checking tables |
 
-## 10. Concepts learned this week, in plain language
+## 12. Concepts learned this week, in plain language
 
 | Concept | Plain explanation |
 | --- | --- |
@@ -504,7 +699,7 @@ What this shows:
 | PII quarantine | Keeping documents with personal identifiers out of the knowledge base entirely |
 | Infrastructure as code | Workspace objects defined in files, reviewed and deployed like code |
 
-## 11. Decisions made and recorded
+## 13. Decisions made and recorded
 
 All decisions are in `docs/decisions/` in the repository.
 
@@ -516,7 +711,7 @@ All decisions are in `docs/decisions/` in the repository.
 | PHS download | From the laptop; the job loads from the Volume | Free Edition serverless compute has no internet access |
 | MLflow trace storage | Experiment storage now; Unity Catalog storage for the agent | Unity Catalog storage can only be chosen when an experiment is created |
 
-## 12. Problems met and how they were fixed
+## 14. Problems met and how they were fixed
 
 | Problem | Cause | Fix | Lesson |
 | --- | --- | --- | --- |
@@ -542,7 +737,7 @@ All decisions are in `docs/decisions/` in the repository.
 | Contents entries without dot leaders and a "DRAFT" watermark became tiny chunks (found while checking the report in Databricks) | Lines such as "4.1 Communication with Patients 7" looked like numbered headings | Drop numbered lines that end in a page number, and stand-alone watermarks | Checking the output against the source finds what tests miss |
 | PHS download stopped with "Remote end closed connection" | Temporary fault on the open-data portal | Downloads retry up to 4 times with increasing waits | External sources fail; retry before failing |
 
-## 13. Key takeaways
+## 15. Key takeaways
 
 - **Measure before you trust.** The search setting that sounded best (hybrid) lost clearly once it was measured. A small labelled question set changed a design decision.
 - **Clean input decides output quality.** Most of the effort went into cleaning PDFs: headers, page numbers, contents pages and wrapped headings. Every fix improved the chunks the search engine sees.
@@ -552,7 +747,7 @@ All decisions are in `docs/decisions/` in the repository.
 - **Free Edition has real limits, and they shaped the design.** One search endpoint, rate-limited embeddings and no internet from jobs. Each limit has a recorded workaround.
 - **Decisions belong in writing.** Four short decision records explain why things are the way they are.
 
-## 14. Final state of the project
+## 16. Final state of the project
 
 ```text
 careconnect-navigator/
@@ -591,7 +786,7 @@ careconnect-navigator/
 | `databricks bundle deploy -t dev` | Deploys the bundle |
 | `databricks bundle run ingest_job -t dev` | Runs ingest and index refresh on serverless |
 
-## 15. Open items carried into Week 3
+## 17. Open items carried into Week 3
 
 The Week 3 course topic is MCP, tool calling and agent orchestration. Its work builds directly on Week 2:
 
