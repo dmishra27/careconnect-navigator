@@ -1,4 +1,5 @@
-# Monthly PHS waiting-times refresh: landing Volume -> bronze -> silver with data-quality checks.
+# Monthly PHS waiting-times refresh: landing Volume -> bronze -> silver with data-quality checks,
+# then the agent's tool data (gold table, clinics) and Unity Catalog tool functions.
 #
 # Free Edition serverless compute has no internet access, so the job does not download.
 # Fetch new PHS files from a laptop first:  uv run phs --env dev --download
@@ -25,6 +26,20 @@ resources:
               - "${bundle.target}"
               - "--config"
               - "${workspace.file_path}/project_config.yml"
+          environment_key: default
+
+        - task_key: agent_tools
+          depends_on:
+            - task_key: phs_waiting_times
+          python_wheel_task:
+            package_name: careconnect
+            entry_point: tools
+            parameters:
+              - "--env"
+              - "${bundle.target}"
+              - "--config"
+              - "${workspace.file_path}/project_config.yml"
+              - "--no-smoke"
           environment_key: default
 
       environments:
