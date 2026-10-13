@@ -99,7 +99,8 @@ RETURNS TABLE (
 COMMENT 'Latest published NHS Scotland waiting times (patients still waiting) for a specialty: number waiting, share waiting over 12 weeks, median and 90th percentile wait in days. Real Public Health Scotland statistics for Scotland or a named real health board; they are not figures for the fictional Firth Valley Health Board.'
 RETURN
   SELECT w.month_ending, w.board_name, w.patient_type,
-         coalesce(w.specialty_name, w.specialty_code),
+         CASE WHEN w.is_all_specialties THEN 'All specialties'
+              ELSE coalesce(w.specialty_name, w.specialty_code) END,
          w.number_waiting, w.waiting_over_12_weeks, w.pct_over_12_weeks,
          w.median_wait_days, w.p90_wait_days,
          '{PHS_SOURCE_LABEL}'

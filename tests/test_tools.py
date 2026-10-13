@@ -38,3 +38,7 @@ def test_clinics_file_has_the_columns_find_clinic_returns():
     header = (ROOT / "data" / "raw" / sql.CLINICS_FILE).read_text(encoding="utf-8").splitlines()[0]
     for col in ("name", "site_type", "town", "address", "phone", "opening_hours", "services"):
         assert col in header.split(",")
+
+
+def test_all_specialties_rows_get_a_readable_name_not_a_code():
+    assert "THEN 'All specialties'" in sql.get_waiting_times_sql(CFG)
