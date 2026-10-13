@@ -18,6 +18,7 @@ dependencies = [
 ingest = "careconnect.ingest.main:main"
 phs = "careconnect.phs.main:main"
 build-index = "careconnect.search.index:main"
+tools = "careconnect.tools.main:main"
 
 [dependency-groups]
 dev = [
