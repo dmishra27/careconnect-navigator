@@ -110,8 +110,30 @@ RETURN
               ELSE w.board_name ILIKE concat('%', trim(get_waiting_times.board), '%') END)
     AND (CASE WHEN get_waiting_times.specialty IS NULL OR trim(get_waiting_times.specialty) = ''
               THEN w.is_all_specialties
-              ELSE w.specialty_name ILIKE concat('%', left(trim(get_waiting_times.specialty),
-                   greatest(length(trim(get_waiting_times.specialty)) - 2, 3)), '%') END)
+              ELSE (
+                -- 1. everyday words patients use for common specialties
+                w.specialty_name ILIKE coalesce(CASE lower(trim(get_waiting_times.specialty))
+                    WHEN 'ent' THEN '%ear%nose%throat%'
+                    WHEN 'ears' THEN '%ear%nose%throat%'
+                    WHEN 'ear nose and throat' THEN '%ear%nose%throat%'
+                    WHEN 'bones' THEN '%orthopaedic%'
+                    WHEN 'joints' THEN '%orthopaedic%'
+                    WHEN 'ortho' THEN '%orthopaedic%'
+                    WHEN 'orthopedics' THEN '%orthopaedic%'
+                    WHEN 'eyes' THEN '%ophthalmolog%'
+                    WHEN 'eye' THEN '%ophthalmolog%'
+                    WHEN 'skin' THEN '%dermatolog%'
+                    WHEN 'heart' THEN '%cardiolog%'
+                    END, '__no_alias__')
+                -- 2. the word as a whole word (so "ENT" never matches "Dental")
+                OR (length(regexp_replace(get_waiting_times.specialty, '[^A-Za-z]', '')) > 0
+                    AND w.specialty_name RLIKE concat('(?i)(^|[^a-z])',
+                        regexp_replace(get_waiting_times.specialty, '[^A-Za-z]', ''), '($|[^a-z])'))
+                -- 3. longer words by stem ("Orthopaedics" finds "Orthopaedic Surgery")
+                OR (length(trim(get_waiting_times.specialty)) > 4
+                    AND w.specialty_name ILIKE concat('%', left(trim(get_waiting_times.specialty),
+                        length(trim(get_waiting_times.specialty)) - 2), '%'))
+              ) END)
     AND (get_waiting_times.patient_type IS NULL OR trim(get_waiting_times.patient_type) = ''
          OR w.patient_type ILIKE concat('%', split(trim(get_waiting_times.patient_type), ' ')[0], '%'))
   ORDER BY w.board_name, w.specialty_name, w.patient_type

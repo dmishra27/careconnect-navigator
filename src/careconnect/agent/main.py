@@ -44,12 +44,29 @@ def _short(text: str, n: int = 110) -> str:
     return text if len(text) <= n else text[: n - 3] + "..."
 
 
+def _preview(result: str) -> str:
+    """Show what a tool returned: for waiting times, which board and specialty each row is."""
+    try:
+        data = json.loads(result)
+    except json.JSONDecodeError:
+        return _short(result, 80)
+    if isinstance(data, dict) and "rows" in data:
+        rows = [
+            f"{r.get('board')} / {r.get('specialty')} / {r.get('patient_type')}"
+            for r in data["rows"]
+        ]
+        return f"{len(rows)} row(s): " + ("; ".join(rows) or "none")
+    if isinstance(data, list):
+        return f"{len(data)} result(s): " + _short(json.dumps(data), 80)
+    return _short(result, 80)
+
+
 def ask(agent: Agent, question: str) -> None:
     print(f"\nQ: {question}")
     result = agent.run(question)
     for i, call in enumerate(result.tool_calls, 1):
         args = json.loads(call.arguments or "{}")
-        print(f"   tool {i}: {call.name}({json.dumps(args)}) -> {_short(call.result, 80)}")
+        print(f"   tool {i}: {call.name}({json.dumps(args)}) -> {_preview(call.result)}")
     print(f"   steps: {result.steps} ({result.stopped})")
     print(f"A: {result.answer}")
 

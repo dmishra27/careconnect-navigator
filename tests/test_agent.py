@@ -158,3 +158,10 @@ def test_sql_runner_passes_empty_arguments_as_null():
     assert sent["statement"] == "SELECT * FROM cat.sch.find_clinic(:service, :town)"
     assert sent["parameters"][0].value == "x"
     assert sent["parameters"][1].value is None
+
+
+def test_prompt_sets_the_waiting_time_rules():
+    from careconnect.agent.prompts import SYSTEM_PROMPT
+
+    for rule in ("SO FAR", "not Firth Valley figures", "Treatment Time Guarantee", "30 June 2026"):
+        assert rule in SYSTEM_PROMPT
