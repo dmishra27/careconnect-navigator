@@ -94,15 +94,17 @@ CREATE OR REPLACE FUNCTION {fn}(
 RETURNS TABLE (
   month_ending DATE, board STRING, patient_type STRING, specialty STRING,
   number_waiting INT, waiting_over_12_weeks INT, pct_over_12_weeks DOUBLE,
-  median_wait_days DOUBLE, p90_wait_days DOUBLE, source STRING
+  median_wait_days DOUBLE, median_wait_weeks DOUBLE, p90_wait_days DOUBLE,
+  p90_wait_weeks DOUBLE, source STRING
 )
-COMMENT 'Latest published NHS Scotland waiting times (patients still waiting) for a specialty: number waiting, share waiting over 12 weeks, median and 90th percentile wait in days. Real Public Health Scotland statistics for Scotland or a named real health board; they are not figures for the fictional Firth Valley Health Board.'
+COMMENT 'Latest published NHS Scotland waiting times (patients still waiting) for a specialty: number waiting, share waiting over 12 weeks, median and 90th percentile time waited so far in days and weeks. Real Public Health Scotland statistics for Scotland or a named real health board; they are not figures for the fictional Firth Valley Health Board.'
 RETURN
   SELECT w.month_ending, w.board_name, w.patient_type,
          CASE WHEN w.is_all_specialties THEN 'All specialties'
               ELSE coalesce(w.specialty_name, w.specialty_code) END,
          w.number_waiting, w.waiting_over_12_weeks, w.pct_over_12_weeks,
-         w.median_wait_days, w.p90_wait_days,
+         w.median_wait_days, ROUND(w.median_wait_days / 7, 1),
+         w.p90_wait_days, ROUND(w.p90_wait_days / 7, 1),
          '{PHS_SOURCE_LABEL}'
   FROM {table} AS w
   WHERE (CASE WHEN get_waiting_times.board IS NULL OR trim(get_waiting_times.board) = ''

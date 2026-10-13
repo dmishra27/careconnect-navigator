@@ -48,3 +48,8 @@ def test_short_specialty_words_match_whole_words_and_aliases():
     text = sql.get_waiting_times_sql(CFG)
     assert "WHEN 'ent' THEN '%ear%nose%throat%'" in text  # everyday word -> PHS name
     assert "(^|[^a-z])" in text  # whole-word match, so "ENT" never matches "Dental"
+
+
+def test_waiting_times_also_returns_weeks_so_the_model_does_not_convert():
+    text = sql.get_waiting_times_sql(CFG)
+    assert "median_wait_weeks DOUBLE" in text and "ROUND(w.median_wait_days / 7, 1)" in text

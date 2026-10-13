@@ -163,5 +163,13 @@ def test_sql_runner_passes_empty_arguments_as_null():
 def test_prompt_sets_the_waiting_time_rules():
     from careconnect.agent.prompts import SYSTEM_PROMPT
 
-    for rule in ("SO FAR", "not Firth Valley figures", "Treatment Time Guarantee", "30 June 2026"):
+    for rule in (
+        "so far",
+        "not Firth Valley",
+        "Treatment Time Guarantee",
+        "30 June 2026",
+        "12 weeks = 84 days",
+        "ONLY with a wait the person has told you",
+        'source_type "leaflet"',
+    ):
         assert rule in SYSTEM_PROMPT
