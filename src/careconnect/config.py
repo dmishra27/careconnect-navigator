@@ -21,6 +21,11 @@ class ProjectConfig(BaseModel):
     search_query_type: str = "AUTO"
 
     @property
+    def agent_experiment_name(self) -> str:
+        """Separate MLflow experiment for agent traces, e.g. careconnect-dev-agent."""
+        return f"{self.experiment_name}-agent"
+
+    @property
     def chunks_index(self) -> str:
         """AI Search index kept in sync with silver_chunks."""
         return self.table("silver_chunks_index")

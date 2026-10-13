@@ -24,6 +24,8 @@ SMOKE_TESTS = [
     ("get_waiting_times", "'Orthopaedics', 'New Outpatient', NULL"),
     ("get_waiting_times", "NULL, NULL, NULL"),
     ("get_waiting_times", "'Ophthalmology', 'Inpatient', 'NHS Lothian'"),
+    ("get_waiting_times", "'ENT', 'New Outpatient', 'NHS Lothian'"),
+    ("get_waiting_times", "'eyes', 'New Outpatient', NULL"),
     ("list_waiting_time_specialties", ""),
 ]
 
