@@ -8,10 +8,11 @@
   uv run agent --list-tools --tools mcp   # show exactly what the model is given
 
 Tool backends:
-  direct      our search + UC functions run through the SQL warehouse (default)
-  mcp         our search + UC functions discovered and called over MCP
+  direct      our search + UC functions run through the SQL warehouse (fallback)
+  mcp         our search + UC functions discovered and called over MCP (default)
   mcp-search  everything over MCP, including Databricks' Vector Search MCP for search
-              (note: that server cannot apply our "current documents only" filter)
+              (not for patient answers: it returned the superseded 2024 leaflet,
+              see docs/decisions/2026-10-14-agent-tool-backend.md)
 
 Traces go to the MLflow experiment <experiment_name>-agent (e.g. careconnect-dev-agent).
 """
@@ -56,7 +57,7 @@ def build_tools(cfg: ProjectConfig, w, backend: str = "direct") -> list:
     return [*mcp_tools(vs_mcp, include={index}, rename={index: "search_guidance"}), *tools]
 
 
-def build_agent(cfg: ProjectConfig, model: str | None = None, backend: str = "direct") -> Agent:
+def build_agent(cfg: ProjectConfig, model: str | None = None, backend: str = "mcp") -> Agent:
     w = WorkspaceClient()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
@@ -125,7 +126,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--config", default=None)
     parser.add_argument("--model", default=None, help="serving endpoint (default: config)")
     parser.add_argument("--demo", action="store_true", help="run the five demo questions")
-    parser.add_argument("--tools", choices=BACKENDS, default="direct", help="tool backend")
+    parser.add_argument("--tools", choices=BACKENDS, default=None, help="default: config")
     parser.add_argument("--list-tools", action="store_true", help="print the tools and exit")
     args = parser.parse_args(argv)
     if not (args.question or args.demo or args.list_tools):
@@ -137,8 +138,9 @@ def main(argv: list[str] | None = None) -> None:
     mlflow.set_experiment(f"/Users/{w.current_user.me().user_name}/{cfg.agent_experiment_name}")
     mlflow.openai.autolog()
 
-    agent = build_agent(cfg, args.model, args.tools)
-    print(f"model: {agent.model}   backend: {args.tools}   tools: {', '.join(agent.toolbox.tools)}")
+    backend = args.tools or cfg.agent_tool_backend
+    agent = build_agent(cfg, args.model, backend)
+    print(f"model: {agent.model}   backend: {backend}   tools: {', '.join(agent.toolbox.tools)}")
     if args.list_tools:
         for tool in agent.toolbox.tools.values():
             params = ", ".join(tool.parameters.get("properties", {})) or "none"

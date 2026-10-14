@@ -121,3 +121,7 @@ def test_demo_preview_reads_both_result_shapes():
     assert _preview(json.dumps(mcp)) == "1 row(s): NHS Lothian / ENT / X"
     assert _preview(json.dumps(clinics)).startswith("1 row(s): ")
     assert _preview("plain text, not JSON") == "plain text, not JSON"
+
+
+def test_default_agent_backend_is_uc_tools_over_mcp_with_our_own_search():
+    assert CFG.agent_tool_backend == "mcp"  # never "mcp-search": it lacks the current-only filter

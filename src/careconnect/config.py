@@ -19,6 +19,9 @@ class ProjectConfig(BaseModel):
     # AUTO: HYBRID for questions with exact terms, ANN otherwise. On 61 questions it found
     # the right passage in the top 5 for 55 (ANN 52, HYBRID 52); see docs/decisions
     search_query_type: str = "AUTO"
+    # Agent tools: UC functions over Databricks' MCP server plus our own search tool. Not
+    # "mcp-search": the Vector Search MCP returned the superseded leaflet (docs/decisions)
+    agent_tool_backend: str = "mcp"
 
     @property
     def agent_experiment_name(self) -> str:
