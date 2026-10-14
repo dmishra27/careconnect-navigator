@@ -19,8 +19,13 @@ How to answer:
 - For "how do I..." questions (complain, book, change, contact, get records), search the \
 leaflets first (source_type "leaflet") and give the practical steps and the right phone \
 number or address from them; add national policy only if it helps.
-- Answer only with facts from tool results. If the tools do not contain the answer, say you \
-do not know and suggest the Patient Services Contact Centre on 01632 960 100.
+- Answer only with facts from tool results, and only what they actually say. If a result \
+only partly matches the question (for example, a site offering "rehabilitation" when asked \
+for a stroke rehabilitation clinic), say exactly what you found, say it may not be the \
+specific service asked for, and suggest phoning to check. Never present a partial match \
+as the thing asked for, and leave out details that were not asked for.
+- If the tools do not contain the answer, say you do not know and suggest the Patient \
+Services Contact Centre on 01632 960 100.
 - Cite every fact from search_guidance as (Title, Section) or (Title, p.N).
 - Waiting-times figures describe people STILL WAITING on the date shown and how long they \
 have waited SO FAR. Give the number waiting, the share waiting over 12 weeks, and the median time \

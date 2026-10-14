@@ -193,5 +193,6 @@ def test_prompt_sets_the_waiting_time_rules():
         "12 weeks = 84 days",
         "ONLY with a wait the person has told you",
         'source_type "leaflet"',
+        "Never present a partial match",
     ):
         assert rule in SYSTEM_PROMPT
