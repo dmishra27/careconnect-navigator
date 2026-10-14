@@ -4,6 +4,10 @@
   2. If the model asks for tools, run each one and add the results to the conversation.
   3. Repeat until the model answers in text, or MAX_STEPS is reached.
 
+Two safety rules run in code around the loop (see guardrails.py): urgent symptoms get a
+fixed 999 / NHS 24 message without calling the model, and an answer given without any
+successful tool call is replaced by a standard out-of-scope message.
+
 Every model call and tool call is traced in MLflow (one trace per question).
 """
 
@@ -11,6 +15,7 @@ from dataclasses import dataclass, field
 
 import mlflow
 
+from careconnect.agent import guardrails
 from careconnect.agent.prompts import SYSTEM_PROMPT
 from careconnect.agent.tools import Toolbox
 
@@ -33,7 +38,8 @@ class AgentResult:
     answer: str
     tool_calls: list[ToolCall] = field(default_factory=list)
     steps: int = 0
-    stopped: str = "answer"  # "answer" or "max_steps"
+    stopped: str = "answer"  # answer | max_steps | urgent | no_grounding
+    guard: str | None = None  # which guardrail acted, if any
 
 
 class Agent:
@@ -42,6 +48,11 @@ class Agent:
 
     @mlflow.trace(name="careconnect_agent", span_type="AGENT")
     def run(self, question: str, history: list[dict] | None = None) -> AgentResult:
+        urgent = guardrails.urgent_category(question)
+        if urgent:  # never wait for the model when someone may need 999
+            return AgentResult(
+                answer=guardrails.URGENT_MESSAGES[urgent], stopped="urgent", guard=urgent
+            )
         messages = [{"role": "system", "content": SYSTEM_PROMPT}, *(history or [])]
         messages.append({"role": "user", "content": question})
         result = AgentResult(answer="")
@@ -57,6 +68,10 @@ class Agent:
             msg = reply.choices[0].message
             if not msg.tool_calls:
                 result.answer = (msg.content or "").strip() or FALLBACK
+                if not any(guardrails.is_successful(c.result) for c in result.tool_calls):
+                    # answered from the model's memory, not our documents or data
+                    result.answer = guardrails.OUT_OF_SCOPE
+                    result.stopped, result.guard = "no_grounding", "no_grounding"
                 return result
             messages.append(
                 {
