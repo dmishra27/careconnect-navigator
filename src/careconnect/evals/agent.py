@@ -127,6 +127,8 @@ def run_cases(agent, cases: list[Case]) -> list[dict]:
         row.update(seconds=round(time.perf_counter() - start, 2), steps=result.steps)
         rows.append(row)
         print(f"  {case.id:<4} {'PASS' if row['passed'] else 'FAIL'}  {row['failures']}")
+        if not row["passed"]:  # show the answer so a reviewer can tell agent from label errors
+            print("        answer: " + " ".join(result.answer.split())[:400])
     return rows
 
 
