@@ -62,13 +62,34 @@ def _toolbox(runner=None):
     return Toolbox(make_uc_tools(CFG, runner or FakeRunner([{"name": "Larbank Health Centre"}])))
 
 
-def test_agent_answers_directly_when_no_tool_is_needed():
-    client = FakeClient([NS(content="Hello.", tool_calls=None)])
-    result = Agent(client, "m", _toolbox()).run("hi")
-    assert result.answer == "Hello."
-    assert result.steps == 1 and not result.tool_calls
+def test_answer_without_any_tool_call_is_replaced_by_the_out_of_scope_message():
+    from careconnect.agent.guardrails import OUT_OF_SCOPE
+
+    client = FakeClient([NS(content="Ibuprofen is best.", tool_calls=None)])
+    result = Agent(client, "m", _toolbox()).run("best painkiller?")
+    assert result.answer == OUT_OF_SCOPE  # never an answer from the model's memory
+    assert result.guard == "no_grounding" and result.steps == 1
     assert client.sent[0]["messages"][0]["role"] == "system"
     assert {t["function"]["name"] for t in client.sent[0]["tools"]} >= {"find_clinic"}
+
+
+def test_urgent_symptoms_are_answered_without_calling_the_model():
+    client = FakeClient([])  # any model call would fail: there are no scripted replies
+    result = Agent(client, "m", _toolbox()).run("My husband has chest pain and can't breathe")
+    assert result.stopped == "urgent" and result.guard == "emergency"
+    assert "999" in result.answer and not client.sent
+
+
+def test_answer_after_only_failed_tool_calls_is_replaced():
+    from careconnect.agent.guardrails import OUT_OF_SCOPE
+
+    client = FakeClient(
+        [
+            NS(content=None, tool_calls=[_tool_call("no_such_tool", {})]),
+            NS(content="Made-up answer.", tool_calls=None),
+        ]
+    )
+    assert Agent(client, "m", _toolbox()).run("?").answer == OUT_OF_SCOPE
 
 
 def test_agent_runs_the_requested_tool_and_feeds_the_result_back():
@@ -98,12 +119,13 @@ def test_tool_errors_go_back_to_the_model_instead_of_crashing():
     client = FakeClient(
         [
             NS(content=None, tool_calls=[_tool_call("no_such_tool", {})]),
-            NS(content="Sorry.", tool_calls=None),
+            NS(content=None, tool_calls=[_tool_call("find_clinic", {})]),
+            NS(content="Larbank.", tool_calls=None),
         ]
     )
     result = Agent(client, "m", _toolbox()).run("?")
     assert "error" in json.loads(result.tool_calls[0].result)
-    assert result.answer == "Sorry."
+    assert result.answer == "Larbank."  # recovered with a second, successful call
 
 
 def test_agent_stops_after_max_steps():
@@ -171,5 +193,6 @@ def test_prompt_sets_the_waiting_time_rules():
         "12 weeks = 84 days",
         "ONLY with a wait the person has told you",
         'source_type "leaflet"',
+        "Never present a partial match",
     ):
         assert rule in SYSTEM_PROMPT
