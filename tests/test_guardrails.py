@@ -28,7 +28,13 @@ def test_emergencies_are_caught(question):
 
 @pytest.mark.parametrize(
     "question",
-    ["I want to kill myself", "I don't want to live any more", "thoughts of self-harm"],
+    [
+        "I want to kill myself",
+        "I don't want to live any more",
+        "thoughts of self-harm",
+        "I keep thinking about ending my life",
+        "He talked about taking his own life",
+    ],
 )
 def test_mental_health_crises_are_caught(question):
     assert urgent_category(question) == MENTAL_HEALTH

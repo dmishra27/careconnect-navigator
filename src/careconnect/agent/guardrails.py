@@ -43,7 +43,8 @@ _PATTERNS: dict[str, list[str]] = {
     MENTAL_HEALTH: [
         r"(kill|harm|hurt) (myself|himself|herself|themselves)",
         r"suicid",
-        r"end (my|his|her) life",
+        r"end(ing)? (my|his|her|their) (own )?li(fe|ves)",
+        r"tak(e|ing) (my|his|her|their) own li(fe|ves)",
         r"(don'?t|do not) want to (live|be alive|be here)",
         r"self[- ]harm",
     ],
