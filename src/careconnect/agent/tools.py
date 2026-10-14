@@ -216,4 +216,5 @@ class Toolbox:
             except Exception as exc:  # noqa: BLE001 - the model can recover from a tool error
                 result = {"error": f"{type(exc).__name__}: {exc}"}
             span.set_outputs(result)
-        return json.dumps(result, default=str)
+        # MCP tools already return text; our own tools return Python objects
+        return result if isinstance(result, str) else json.dumps(result, default=str)
