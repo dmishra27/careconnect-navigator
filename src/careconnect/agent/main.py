@@ -69,20 +69,40 @@ def _short(text: str, n: int = 110) -> str:
     return text if len(text) <= n else text[: n - 3] + "..."
 
 
+def _rows(data) -> list[dict] | None:
+    """Rows as dicts, from our tools ({"rows": [{...}]}) or the UC MCP server
+    ({"columns": [...], "rows": [[...]]})."""
+    if not isinstance(data, dict) or not isinstance(data.get("rows"), list):
+        return None
+    rows, cols = data["rows"], data.get("columns")
+    if cols and rows and isinstance(rows[0], list):
+        names = [c.get("name") if isinstance(c, dict) else c for c in cols]
+        return [dict(zip(names, r, strict=False)) for r in rows]
+    return [r for r in rows if isinstance(r, dict)]
+
+
 def _preview(result: str) -> str:
-    """Show what a tool returned: for waiting times, which board and specialty each row is."""
+    """Show what a tool returned: for waiting times, which board and specialty each row is.
+
+    Display only: never let a format we did not expect stop the demo.
+    """
     try:
         data = json.loads(result)
-    except json.JSONDecodeError:
-        return _short(result, 80)
-    if isinstance(data, dict) and "rows" in data:
-        rows = [
-            f"{r.get('board')} / {r.get('specialty')} / {r.get('patient_type')}"
-            for r in data["rows"]
-        ]
-        return f"{len(rows)} row(s): " + ("; ".join(rows) or "none")
-    if isinstance(data, list):
-        return f"{len(data)} result(s): " + _short(json.dumps(data), 80)
+    except (json.JSONDecodeError, TypeError):
+        return _short(str(result), 80)
+    try:
+        rows = _rows(data)
+        if rows is not None and rows and "specialty" in rows[0]:
+            labels = [
+                f"{r.get('board')} / {r.get('specialty')} / {r.get('patient_type')}" for r in rows
+            ]
+            return f"{len(rows)} row(s): " + "; ".join(labels)
+        if rows is not None:
+            return f"{len(rows)} row(s): " + _short(json.dumps(rows), 80)
+        if isinstance(data, list):
+            return f"{len(data)} result(s): " + _short(json.dumps(data), 80)
+    except Exception:  # noqa: BLE001 - display only
+        pass
     return _short(result, 80)
 
 

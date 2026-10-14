@@ -106,3 +106,18 @@ def test_names_and_urls():
     assert uc_functions_url(CFG, "https://h/") == (
         "https://h/api/2.0/mcp/functions/workspace/careconnect_dev"
     )
+
+
+def test_demo_preview_reads_both_result_shapes():
+    from careconnect.agent.main import _preview
+
+    ours = {
+        "source": "PHS",
+        "rows": [{"board": "Scotland", "specialty": "ENT", "patient_type": "X"}],
+    }
+    mcp = {"columns": ["board", "specialty", "patient_type"], "rows": [["NHS Lothian", "ENT", "X"]]}
+    clinics = {"columns": [{"name": "name"}], "rows": [["Larbank Health Centre"]]}
+    assert _preview(json.dumps(ours)) == "1 row(s): Scotland / ENT / X"
+    assert _preview(json.dumps(mcp)) == "1 row(s): NHS Lothian / ENT / X"
+    assert _preview(json.dumps(clinics)).startswith("1 row(s): ")
+    assert _preview("plain text, not JSON") == "plain text, not JSON"
