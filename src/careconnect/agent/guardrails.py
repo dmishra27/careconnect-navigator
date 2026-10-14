@@ -68,11 +68,10 @@ URGENT_MESSAGES = {
 }
 
 OUT_OF_SCOPE = (
-    "I can only answer questions about Firth Valley Health Board services and NHS Scotland "
-    "patient guidance, using our leaflets, policy documents and published waiting-times "
-    "figures, and I could not find an answer to that in them. For help, contact the Patient "
-    "Services Contact Centre on 01632 960 100. For medical advice, speak to your GP, a "
-    "pharmacist or NHS 24 on 111."
+    "I could not find an answer to that in our leaflets, NHS Scotland guidance, clinic list or "
+    "published waiting-times figures, so I would rather not guess. The Patient Services "
+    "Contact Centre on 01632 960 100 can help with questions about our services. For medical "
+    "advice, speak to your GP, a pharmacist or NHS 24 on 111."
 )
 
 
