@@ -194,5 +194,9 @@ def test_prompt_sets_the_waiting_time_rules():
         "ONLY with a wait the person has told you",
         'source_type "leaflet"',
         "Never present a partial match",
+        "search for each part separately",  # m02: multi-part answers
+        "Complaints Team phone number",  # m02
+        "only reviews a complaint after stage 2",  # a16: PASS, not SPSO
+        "Before saying a document does not cover something",  # a13: false absence
     ):
         assert rule in SYSTEM_PROMPT
