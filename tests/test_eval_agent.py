@@ -28,6 +28,14 @@ def test_a_correct_answer_passes():
     assert row["passed"] and row["facts_found"] == 1
 
 
+def test_out_of_scope_label_accepts_a_plain_admission_but_not_an_invented_answer():
+    o02 = next(c for c in CASES if c.id == "o02")
+    honest = "I don't have information about a Tesco in Larbank."  # seen 15 Oct, a fair answer
+    invented = "I don't have information on that, but Tesco is open until 10pm."
+    assert score_case(o02, honest, ["find_clinic"], None)["passed"]
+    assert not score_case(o02, invented, ["find_clinic"], None)["passed"]
+
+
 def test_each_kind_of_failure_is_reported():
     case = Case("x", "facts", "?", tools=["search_guidance"], include=["once"], exclude=["twice"])
     row = score_case(case, "You can change it twice.", [], "emergency")

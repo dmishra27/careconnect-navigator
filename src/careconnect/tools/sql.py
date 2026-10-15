@@ -80,8 +80,39 @@ RETURN
 """
 
 
+# Everyday words patients use -> a pattern for the PHS specialty name. Matched against any
+# whole word of the model's specialty argument, so "eye operations" and "my knee joint" work.
+SPECIALTY_ALIASES: dict[str, tuple[str, ...]] = {
+    "%ear%nose%throat%": ("ent", "ear", "ears"),
+    "%orthopaedic%": (
+        "bones",
+        "joint",
+        "joints",
+        "knee",
+        "hip",
+        "ortho",
+        "orthopedic",
+        "orthopedics",
+    ),
+    "%ophthalmolog%": ("eye", "eyes", "cataract", "cataracts"),
+    "%dermatolog%": ("skin",),
+    "%cardiolog%": ("heart",),
+}
+
+
+def specialty_alias_case(arg: str = "get_waiting_times.specialty") -> str:
+    """SQL CASE returning the PHS name pattern for the first alias word found in the argument."""
+    words = f"split(lower(trim({arg})), '[^a-z]+')"
+    whens = " ".join(
+        f"WHEN exists({words}, x -> x IN ({', '.join(repr(w) for w in ws)})) THEN '{pattern}'"
+        for pattern, ws in SPECIALTY_ALIASES.items()
+    )
+    return f"CASE {whens} END"
+
+
 def get_waiting_times_sql(cfg: ProjectConfig) -> str:
     fn, table = cfg.table(GET_WAITING_TIMES), cfg.table(WAITS_TABLE)
+    alias_case = specialty_alias_case()
     return f"""
 CREATE OR REPLACE FUNCTION {fn}(
   specialty STRING DEFAULT NULL
@@ -113,20 +144,8 @@ RETURN
     AND (CASE WHEN get_waiting_times.specialty IS NULL OR trim(get_waiting_times.specialty) = ''
               THEN w.is_all_specialties
               ELSE (
-                -- 1. everyday words patients use for common specialties
-                w.specialty_name ILIKE coalesce(CASE lower(trim(get_waiting_times.specialty))
-                    WHEN 'ent' THEN '%ear%nose%throat%'
-                    WHEN 'ears' THEN '%ear%nose%throat%'
-                    WHEN 'ear nose and throat' THEN '%ear%nose%throat%'
-                    WHEN 'bones' THEN '%orthopaedic%'
-                    WHEN 'joints' THEN '%orthopaedic%'
-                    WHEN 'ortho' THEN '%orthopaedic%'
-                    WHEN 'orthopedics' THEN '%orthopaedic%'
-                    WHEN 'eyes' THEN '%ophthalmolog%'
-                    WHEN 'eye' THEN '%ophthalmolog%'
-                    WHEN 'skin' THEN '%dermatolog%'
-                    WHEN 'heart' THEN '%cardiolog%'
-                    END, '__no_alias__')
+                -- 1. everyday words patients use, matched on ANY word ("eye operations")
+                w.specialty_name ILIKE coalesce({alias_case}, '__no_alias__')
                 -- 2. the word as a whole word (so "ENT" never matches "Dental")
                 OR (length(regexp_replace(get_waiting_times.specialty, '[^A-Za-z]', '')) > 0
                     AND w.specialty_name RLIKE concat('(?i)(^|[^a-z])',

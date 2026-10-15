@@ -26,6 +26,7 @@ SMOKE_TESTS = [
     ("get_waiting_times", "'Ophthalmology', 'Inpatient', 'NHS Lothian'"),
     ("get_waiting_times", "'ENT', 'New Outpatient', 'NHS Lothian'"),
     ("get_waiting_times", "'eyes', 'New Outpatient', NULL"),
+    ("get_waiting_times", "'eye operations', 'Inpatient', NULL"),  # alias on any word
     ("list_waiting_time_specialties", ""),
 ]
 
