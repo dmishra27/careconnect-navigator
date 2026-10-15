@@ -46,8 +46,21 @@ def test_all_specialties_rows_get_a_readable_name_not_a_code():
 
 def test_short_specialty_words_match_whole_words_and_aliases():
     text = sql.get_waiting_times_sql(CFG)
-    assert "WHEN 'ent' THEN '%ear%nose%throat%'" in text  # everyday word -> PHS name
+    assert "x IN ('ent', 'ear', 'ears')) THEN '%ear%nose%throat%'" in text  # everyday word
     assert "(^|[^a-z])" in text  # whole-word match, so "ENT" never matches "Dental"
+
+
+def test_aliases_match_any_word_of_the_specialty_so_eye_operations_finds_ophthalmology():
+    import re
+
+    text = sql.get_waiting_times_sql(CFG)
+    # the argument is split into words and each alias is checked against every word
+    assert "exists(split(lower(trim(get_waiting_times.specialty)), '[^a-z]+')" in text
+    words = re.split("[^a-z]+", "eye operations".lower())
+    hits = [p for p, ws in sql.SPECIALTY_ALIASES.items() if set(ws) & set(words)]
+    assert hits == ["%ophthalmolog%"]
+    # "dental" splits to one word, so the "ent" alias can never fire on it
+    assert not set(sql.SPECIALTY_ALIASES["%ear%nose%throat%"]) & set(re.split("[^a-z]+", "dental"))
 
 
 def test_waiting_times_also_returns_weeks_so_the_model_does_not_convert():

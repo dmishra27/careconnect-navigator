@@ -136,6 +136,45 @@ def test_agent_stops_after_max_steps():
     assert len(result.tool_calls) == 3
 
 
+def test_a_failed_tool_call_is_retried_once_then_reported():
+    from careconnect.agent.tools import Tool
+
+    calls = []
+
+    def flaky(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            raise TimeoutError("warehouse busy")
+        return [{"name": "Larbank Health Centre"}]
+
+    tool = Tool("find_clinic", "d", {"type": "object", "properties": {}}, flaky)
+    box = Toolbox([tool], retry_delay=0)
+    assert json.loads(box.run("find_clinic", "{}")) == [{"name": "Larbank Health Centre"}]
+    assert len(calls) == 2
+
+    def always_down(**kwargs):
+        raise TimeoutError("still busy")
+
+    down = Toolbox([Tool("find_clinic", "d", {"type": "object", "properties": {}}, always_down)],
+                   retry_delay=0)  # fmt: skip
+    assert "TimeoutError" in json.loads(down.run("find_clinic", "{}"))["error"]
+
+
+def test_wrong_arguments_are_not_retried():
+    from careconnect.agent.tools import Tool
+
+    calls = []
+
+    def strict(**kwargs):
+        calls.append(kwargs)
+        raise TypeError("unexpected argument")
+
+    box = Toolbox([Tool("find_clinic", "d", {"type": "object", "properties": {}}, strict)],
+                  retry_delay=0)  # fmt: skip
+    assert "error" in json.loads(box.run("find_clinic", '{"x": 1}'))
+    assert len(calls) == 1
+
+
 def test_waiting_times_states_its_source_once():
     rows = [{"board": "Scotland", "source": "PHS"}, {"board": "Scotland", "source": "PHS"}]
     out = json.loads(_toolbox(FakeRunner(rows)).run("get_waiting_times", "{}"))
@@ -198,5 +237,9 @@ def test_prompt_sets_the_waiting_time_rules():
         "Complaints Team phone number",  # m02
         "only reviews a complaint after stage 2",  # a16: PASS, not SPSO
         "Before saying a document does not cover something",  # a13: false absence
+        "Search first with the person's own words",  # a13: no rewriting into "how to"
+        '"how long" needs the time it takes',  # a13: answer what was asked
+        "Never mention tools, functions",  # o02
+        'say plainly "I do not know"',  # o02
     ):
         assert rule in SYSTEM_PROMPT

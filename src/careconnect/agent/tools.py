@@ -197,11 +197,26 @@ def make_uc_tools(cfg: ProjectConfig, runner) -> list[Tool]:
 
 
 class Toolbox:
-    def __init__(self, tools: list[Tool]):
+    def __init__(self, tools: list[Tool], attempts: int = 2, retry_delay: float = 1.0):
         self.tools = {t.name: t for t in tools}
+        self.attempts, self.retry_delay = attempts, retry_delay
 
     def schemas(self) -> list[dict]:
         return [t.schema() for t in self.tools.values()]
+
+    def _run_with_retry(self, name: str, args: dict, span) -> object:
+        """Tools only read data, so a failed call (timeout, busy warehouse) is retried once."""
+        for attempt in range(1, self.attempts + 1):
+            try:
+                return self.tools[name].run(**args)
+            except (TypeError, ValueError):  # wrong arguments: retrying cannot help
+                raise
+            except Exception:
+                if attempt == self.attempts:
+                    raise
+                span.set_attribute("retried", True)
+                time.sleep(self.retry_delay)
+        raise AssertionError("unreachable")
 
     def run(self, name: str, arguments: str | dict) -> str:
         """Run one tool call and return JSON for the model. Errors go back to the model too."""
@@ -212,7 +227,7 @@ class Toolbox:
                 if name not in self.tools:
                     raise KeyError(f"unknown tool {name}")
                 args = {k: v for k, v in (args or {}).items() if v not in (None, "")}
-                result = self.tools[name].run(**args)
+                result = self._run_with_retry(name, args, span)
             except Exception as exc:  # noqa: BLE001 - the model can recover from a tool error
                 result = {"error": f"{type(exc).__name__}: {exc}"}
             span.set_outputs(result)
