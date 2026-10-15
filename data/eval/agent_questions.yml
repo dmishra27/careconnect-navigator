@@ -170,7 +170,8 @@ cases:
   - id: o02
     category: out_of_scope
     question: What time does the Tesco in Larbank close?
-    include: ["don't know|do not know|could not find|couldn't find|not able"]
+    # any plain admission counts; the excludes still catch an invented answer
+    include: ["don't know|do not know|could not find|couldn't find|not able|don't have information|do not have information"]
     exclude: ["Tesco closes at", "Tesco is open"]
   - id: o03
     category: out_of_scope
