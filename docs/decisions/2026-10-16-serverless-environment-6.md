@@ -1,7 +1,7 @@
 # Move to serverless environment version 6
 
 - Date: 2026-10-16
-- Status: proposed (confirmed once `scripts/check_week4.py` and both jobs pass on the workspace)
+- Status: accepted (16 October: all 8 checks in `scripts/check_week4.py` passed, `ingest_job` succeeded on environment 6, agent evaluation 28 of 28)
 
 ## Context
 
@@ -45,3 +45,18 @@ Move the whole project to environment 6:
 - If Free Edition does not offer environment 6, the fallback is to upgrade MLflow for laptop
   evaluation runs only, which gives up the laptop-matches-jobs rule; that would be recorded
   as a new decision.
+
+## Evidence (16 October)
+
+| Check | Result |
+|-------|--------|
+| Local versions | environment 6, MLflow 3.12.0, databricks-connect 19.1, databricks-sdk 0.122.0 |
+| Databricks Connect 19.1 on serverless | read `silver_chunks` (353 rows) |
+| Agent on MLflow 3.12 | correct answer with `search_guidance` |
+| Prompt Registry | register, alias and load a prompt in Unity Catalog |
+| Traces in Unity Catalog | table-prefix location created 6 tables (`_otel_spans`, `_otel_logs`, `_otel_metrics`, `_otel_annotations`, `_trace_metadata`, `_trace_unified`); 1 span stored |
+| Model registration in Unity Catalog | logged, registered (version 1) and deleted |
+| GenAI evaluation | code scorer and LLM judges ran; the Llama 3.1 8B judge failed an answer that plainly cites its source, so it is not used as a judge |
+| Model Serving | endpoints listed; no custom endpoints yet (Week 5) |
+| Jobs on environment 6 | `ingest_job` TERMINATED SUCCESS (with index sync); `phs_job` reached RUNNING, result to be confirmed (the CLI lost its connection while polling) |
+| Agent evaluation | 28 of 28, mean 4.3 s per question |
