@@ -172,7 +172,7 @@ record where each comes from.
 
 | Area | Tools |
 | --- | --- |
-| Platform | Databricks Free Edition (serverless), Unity Catalog, Volumes, Delta Lake |
+| Platform | Databricks Free Edition (serverless environment 6), Unity Catalog, Volumes, Delta Lake |
 | Pipelines and deployment | Lakeflow Jobs, Declarative Automation Bundles, Databricks CLI |
 | Retrieval and models | AI Search (Delta Sync index), Foundation Model APIs (`databricks-gte-large-en`, Llama 3.3 70B, Llama 3.1 8B) |
 | Agent and tools | OpenAI-compatible tool calling, Unity Catalog SQL functions, Databricks managed MCP servers (JSON-RPC over HTTP) |
@@ -197,7 +197,7 @@ careconnect-navigator/
 ├── data/
 │   ├── raw/                  # leaflets, clinics, source manifests
 │   └── eval/                 # retrieval_questions.yml, agent_questions.yml
-├── scripts/                  # quick checks (connection, ingest, LLM call, Week 3 capabilities)
+├── scripts/                  # quick checks (connection, ingest, LLM call, Week 3 and 4 capabilities)
 ├── tests/                    # unit tests; integration tests marked `integration`
 └── docs/                     # weekly reports and decision records
 ```
@@ -256,8 +256,11 @@ uv run pytest -m "not integration"
 - [Week 2 report](docs/week2_report.md): ingestion, search index, retrieval evaluation, PHS
   pipeline, experiment log and findings
 - [Week 2 summary](docs/week2.md)
+- [Week 3 report](docs/week3_report.md): tools as Unity Catalog functions over managed MCP, agent
+  loop, safety guardrails, agent evaluation (25 of 28, then 28 of 28 in three runs after fixes)
 - [Decision records](docs/decisions/): workspace layout, retrieval query type and chunk size, no
-  internet on Free Edition jobs, MLflow trace storage, agent tool backend (MCP)
+  internet on Free Edition jobs, MLflow trace storage, agent tool backend (MCP), serverless
+  environment 6
 - [Project progress tracker](https://claude.ai/code/artifact/93fe6141-72c6-4c91-9ea3-47d1c7581c25):
   goals, roadmap, step-by-step status, architecture
 
