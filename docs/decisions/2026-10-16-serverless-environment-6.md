@@ -1,7 +1,7 @@
 # Move to serverless environment version 6
 
 - Date: 2026-10-16
-- Status: accepted (16 October: all 8 checks in `scripts/check_week4.py` passed, `ingest_job` succeeded on environment 6, agent evaluation 28 of 28)
+- Status: accepted (16 October: all 8 checks in `scripts/check_week4.py` passed, `ingest_job` and `phs_job` succeeded on environment 6, agent evaluation 28 of 28)
 
 ## Context
 
@@ -58,5 +58,5 @@ Move the whole project to environment 6:
 | Model registration in Unity Catalog | logged, registered (version 1) and deleted |
 | GenAI evaluation | code scorer and LLM judges ran; the Llama 3.1 8B judge failed an answer that plainly cites its source, so it is not used as a judge |
 | Model Serving | endpoints listed; no custom endpoints yet (Week 5) |
-| Jobs on environment 6 | `ingest_job` TERMINATED SUCCESS (with index sync); `phs_job` reached RUNNING, result to be confirmed (the CLI lost its connection while polling) |
+| Jobs on environment 6 | `ingest_job` TERMINATED SUCCESS (with index sync); `phs_job` SUCCESS (all tasks) |
 | Agent evaluation | 28 of 28, mean 4.3 s per question |
