@@ -8,7 +8,8 @@ Two safety rules run in code around the loop (see guardrails.py): urgent symptom
 fixed 999 / NHS 24 message without calling the model, and an answer given without any
 successful tool call is replaced by a standard out-of-scope message.
 
-Every model call and tool call is traced in MLflow (one trace per question).
+Every model call and tool call is traced in MLflow (one trace per question), and each trace
+is tagged with the backend, model, prompt fingerprint and outcome (see tracing.py).
 """
 
 from dataclasses import dataclass, field
@@ -18,6 +19,7 @@ import mlflow
 from careconnect.agent import guardrails
 from careconnect.agent.prompts import SYSTEM_PROMPT
 from careconnect.agent.tools import Toolbox
+from careconnect.agent.tracing import prompt_hash, tag_current_trace
 
 MAX_STEPS = 6
 FALLBACK = (
@@ -43,11 +45,39 @@ class AgentResult:
 
 
 class Agent:
-    def __init__(self, client, model: str, toolbox: Toolbox, max_steps: int = MAX_STEPS):
+    def __init__(
+        self,
+        client,
+        model: str,
+        toolbox: Toolbox,
+        max_steps: int = MAX_STEPS,
+        trace_tags: dict | None = None,
+    ):
         self.client, self.model, self.toolbox, self.max_steps = client, model, toolbox, max_steps
+        self.trace_tags = {"model": model, "prompt_hash": prompt_hash(SYSTEM_PROMPT)}
+        self.trace_tags.update(trace_tags or {})
 
     @mlflow.trace(name="careconnect_agent", span_type="AGENT")
-    def run(self, question: str, history: list[dict] | None = None) -> AgentResult:
+    def run(
+        self, question: str, history: list[dict] | None = None, tags: dict | None = None
+    ) -> AgentResult:
+        """Answer one question. `tags` (for example case_id) are added to the trace."""
+        retries_before = getattr(self.toolbox, "retries", 0)
+        result = self._run(question, history)
+        tag_current_trace(
+            {
+                **self.trace_tags,
+                **(tags or {}),
+                "stopped": result.stopped,
+                "guard": result.guard or "none",
+                "steps": result.steps,
+                "tool_calls": len(result.tool_calls),
+                "retries": getattr(self.toolbox, "retries", 0) - retries_before,
+            }
+        )
+        return result
+
+    def _run(self, question: str, history: list[dict] | None) -> AgentResult:
         urgent = guardrails.urgent_category(question)
         if urgent:  # never wait for the model when someone may need 999
             return AgentResult(

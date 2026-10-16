@@ -22,11 +22,18 @@ class ProjectConfig(BaseModel):
     # Agent tools: UC functions over Databricks' MCP server plus our own search tool. Not
     # "mcp-search": the Vector Search MCP returned the superseded leaflet (docs/decisions)
     agent_tool_backend: str = "mcp"
+    # Agent traces go to Unity Catalog tables named <catalog>.<schema>.<prefix>_* (Week 4)
+    agent_trace_prefix: str = "careconnect_agent"
 
     @property
     def agent_experiment_name(self) -> str:
         """Separate MLflow experiment for agent traces, e.g. careconnect-dev-agent."""
         return f"{self.experiment_name}-agent"
+
+    @property
+    def agent_uc_experiment_name(self) -> str:
+        """Experiment whose traces are stored in Unity Catalog, e.g. careconnect-dev-agent-uc."""
+        return f"{self.agent_experiment_name}-uc"
 
     @property
     def chunks_index(self) -> str:

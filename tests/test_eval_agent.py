@@ -36,6 +36,28 @@ def test_out_of_scope_label_accepts_a_plain_admission_but_not_an_invented_answer
     assert not score_case(o02, invented, ["find_clinic"], None)["passed"]
 
 
+def test_every_case_is_run_with_its_trace_tags():
+    from types import SimpleNamespace as NS
+
+    from careconnect.evals.agent import run_cases
+
+    class FakeAgent:
+        def __init__(self):
+            self.tags = []
+
+        def run(self, question, tags=None):
+            self.tags.append(tags)
+            return NS(answer="Larbank Health Centre", tool_calls=[], guard=None, steps=1)
+
+    agent = FakeAgent()
+    case = Case("a03", "clinics", "blood test?", include=["Larbank"])
+    rows = run_cases(agent, [case], eval_run="mcp-20261017-101500")
+    assert rows[0]["passed"]
+    assert agent.tags == [
+        {"case_id": "a03", "category": "clinics", "eval_run": "mcp-20261017-101500"}
+    ]
+
+
 def test_each_kind_of_failure_is_reported():
     case = Case("x", "facts", "?", tools=["search_guidance"], include=["once"], exclude=["twice"])
     row = score_case(case, "You can change it twice.", [], "emergency")
