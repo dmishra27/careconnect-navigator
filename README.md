@@ -256,6 +256,8 @@ uv run pytest -m "not integration"
 - [Week 2 report](docs/week2_report.md): ingestion, search index, retrieval evaluation, PHS
   pipeline, experiment log and findings
 - [Week 2 summary](docs/week2.md)
+- [Week 3 report](docs/week3_report.md): tools as Unity Catalog functions over managed MCP, agent
+  loop, safety guardrails, agent evaluation (25 of 28, then 28 of 28 in three runs after fixes)
 - [Decision records](docs/decisions/): workspace layout, retrieval query type and chunk size, no
   internet on Free Edition jobs, MLflow trace storage, agent tool backend (MCP)
 - [Project progress tracker](https://claude.ai/code/artifact/93fe6141-72c6-4c91-9ea3-47d1c7581c25):
