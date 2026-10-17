@@ -7,6 +7,7 @@
   uv run agent --demo --tools mcp         # UC tools through Databricks' MCP server
   uv run agent --demo --tools mcp-search  # search through the Vector Search MCP too
   uv run agent --list-tools --tools mcp   # show exactly what the model is given
+  uv run agent --experiment-traces "..."  # keep traces in the experiment, not Unity Catalog
 
 Tool backends:
   direct      our search + UC functions run through the SQL warehouse (fallback)
@@ -29,6 +30,7 @@ from databricks.sdk import WorkspaceClient
 from careconnect.agent.loop import Agent
 from careconnect.agent.mcp import McpClient, mcp_tools, uc_functions_url, vector_search_url
 from careconnect.agent.tools import SqlRunner, Toolbox, make_search_tool, make_uc_tools
+from careconnect.agent.tracing import setup_agent_experiment, trace_table
 from careconnect.config import ProjectConfig
 from careconnect.ingest.main import _find_config
 from careconnect.search.retriever import Retriever
@@ -77,7 +79,12 @@ def build_agent(cfg: ProjectConfig, model: str | None = None, backend: str = "mc
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
         client = w.serving_endpoints.get_open_ai_client()
-    return Agent(client, model or cfg.llm_endpoint, Toolbox(build_tools(cfg, w, backend)))
+    return Agent(
+        client,
+        model or cfg.llm_endpoint,
+        Toolbox(build_tools(cfg, w, backend)),
+        trace_tags={"backend": backend},
+    )
 
 
 def _short(text: str, n: int = 110) -> str:
@@ -145,14 +152,20 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--safety-demo", action="store_true", help="run the safety questions")
     parser.add_argument("--tools", choices=BACKENDS, default=None, help="default: config")
     parser.add_argument("--list-tools", action="store_true", help="print the tools and exit")
+    parser.add_argument(
+        "--experiment-traces",
+        action="store_true",
+        help="store traces in the MLflow experiment instead of Unity Catalog",
+    )
     args = parser.parse_args(argv)
     if not (args.question or args.demo or args.safety_demo or args.list_tools):
         parser.error("give a question, --demo, --safety-demo or --list-tools")
 
     cfg = ProjectConfig.from_yaml(args.config or _find_config(), env=args.env)
     w = WorkspaceClient()
-    mlflow.set_tracking_uri("databricks")
-    mlflow.set_experiment(f"/Users/{w.current_user.me().user_name}/{cfg.agent_experiment_name}")
+    experiment = setup_agent_experiment(
+        cfg, w.current_user.me().user_name, uc=not args.experiment_traces
+    )
     mlflow.openai.autolog()
 
     backend = args.tools or cfg.agent_tool_backend
@@ -166,7 +179,8 @@ def main(argv: list[str] | None = None) -> None:
     questions = DEMO_QUESTIONS if args.demo else SAFETY_QUESTIONS if args.safety_demo else []
     for q in questions or [args.question]:
         ask(agent, q)
-    print(f"\nTraces: MLflow experiment {cfg.agent_experiment_name}")
+    where = "MLflow experiment" if args.experiment_traces else f"Unity Catalog ({trace_table(cfg)})"
+    print(f"\nTraces: {experiment.rsplit('/', 1)[-1]}, stored in {where}")
 
 
 if __name__ == "__main__":

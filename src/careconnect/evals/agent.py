@@ -8,10 +8,11 @@ Checks are deterministic (no LLM judge yet), so a run is cheap, repeatable and e
 
   uv run python -m careconnect.evals.agent --env dev                 # default tool backend
   uv run python -m careconnect.evals.agent --env dev --tools direct  # compare backends
-  uv run python -m careconnect.evals.agent --env dev --uc-traces     # traces in Unity Catalog
+  uv run python -m careconnect.evals.agent --env dev --experiment-traces  # old trace storage
 
-Results go to MLflow (experiment <experiment_name>-agent, runs agent-eval-*) with a
-per-question table; every agent call is also traced there.
+Results go to MLflow (experiment <experiment_name>-agent-uc-traces, runs agent-eval-*) with a
+per-question table. Every agent call is traced to Unity Catalog tables and tagged with
+case_id, category and eval_run, so trace_report.py can analyse a run with SQL.
 """
 
 import argparse
@@ -23,6 +24,7 @@ from pathlib import Path
 import yaml
 
 from careconnect.agent.guardrails import EMERGENCY, MENTAL_HEALTH
+from careconnect.agent.tracing import setup_agent_experiment, trace_table
 from careconnect.config import ProjectConfig
 from careconnect.ingest.main import _find_config
 
@@ -118,11 +120,12 @@ def summarise(rows: list[dict]) -> dict:
     return metrics
 
 
-def run_cases(agent, cases: list[Case]) -> list[dict]:
+def run_cases(agent, cases: list[Case], eval_run: str | None = None) -> list[dict]:
     rows = []
     for case in cases:
         start = time.perf_counter()
-        result = agent.run(case.question)
+        tags = {"case_id": case.id, "category": case.category, "eval_run": eval_run}
+        result = agent.run(case.question, tags=tags)
         row = score_case(case, result.answer, [c.name for c in result.tool_calls], result.guard)
         row.update(seconds=round(time.perf_counter() - start, 2), steps=result.steps)
         rows.append(row)
@@ -130,23 +133,6 @@ def run_cases(agent, cases: list[Case]) -> list[dict]:
         if not row["passed"]:  # show the answer so a reviewer can tell agent from label errors
             print("        answer: " + " ".join(result.answer.split())[:400])
     return rows
-
-
-def _setup_uc_traces(cfg: ProjectConfig, experiment: str) -> str:
-    """Point the experiment's traces at Unity Catalog; fall back quietly if not allowed."""
-    import mlflow
-    from mlflow.entities import UCSchemaLocation
-
-    try:
-        from mlflow.tracing import set_experiment_trace_location
-
-        exp = mlflow.set_experiment(experiment)
-        set_experiment_trace_location(
-            UCSchemaLocation(cfg.catalog, cfg.schema_name), experiment_id=exp.experiment_id
-        )
-        return f"traces stored in Unity Catalog schema {cfg.catalog}.{cfg.schema_name}"
-    except Exception as exc:  # noqa: BLE001 - preview feature; keep evaluating without it
-        return f"Unity Catalog trace storage not available ({type(exc).__name__}: {exc})"
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -163,7 +149,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--model", default=None)
     parser.add_argument("--cases", default=None)
     parser.add_argument("--only", default=None, help="comma-separated case ids")
-    parser.add_argument("--uc-traces", action="store_true", help="store traces in Unity Catalog")
+    parser.add_argument(
+        "--experiment-traces",
+        action="store_true",
+        help="store traces in the MLflow experiment instead of Unity Catalog",
+    )
     parser.add_argument("--no-mlflow", action="store_true")
     args = parser.parse_args(argv)
 
@@ -177,17 +167,17 @@ def main(argv: list[str] | None = None) -> None:
     backend = args.tools or cfg.agent_tool_backend
 
     w = WorkspaceClient()
-    mlflow.set_tracking_uri("databricks")
-    name = cfg.agent_experiment_name + ("-uc" if args.uc_traces else "")
-    experiment = f"/Users/{w.current_user.me().user_name}/{name}"
-    if args.uc_traces:
-        print(_setup_uc_traces(cfg, experiment))
-    mlflow.set_experiment(experiment)
+    experiment = setup_agent_experiment(
+        cfg, w.current_user.me().user_name, uc=not args.experiment_traces
+    )
+    name = experiment.rsplit("/", 1)[-1]
     mlflow.openai.autolog()
 
     agent = build_agent(cfg, args.model, backend)
-    print(f"model: {agent.model}   backend: {backend}   cases: {len(cases)}")
-    rows = run_cases(agent, cases)
+    # one label per evaluation run, on every trace and on the MLflow run, so SQL can join them
+    eval_run = f"{backend}-{time.strftime('%Y%m%d-%H%M%S')}"
+    print(f"model: {agent.model}   backend: {backend}   cases: {len(cases)}   eval_run: {eval_run}")
+    rows = run_cases(agent, cases, eval_run)
     metrics = summarise(rows)
 
     print("\nSummary")
@@ -196,11 +186,21 @@ def main(argv: list[str] | None = None) -> None:
 
     if not args.no_mlflow:
         with mlflow.start_run(run_name=f"agent-eval-{backend}"):
-            mlflow.set_tag("stage", "week3-agent-eval")
-            mlflow.log_params({"backend": backend, "model": agent.model, "cases": len(cases)})
+            mlflow.set_tags({"stage": "week4-agent-eval", "eval_run": eval_run})
+            mlflow.log_params(
+                {
+                    "backend": backend,
+                    "model": agent.model,
+                    "cases": len(cases),
+                    "prompt_hash": agent.trace_tags["prompt_hash"],
+                    "eval_run": eval_run,
+                }
+            )
             mlflow.log_metrics({k: float(v) for k, v in metrics.items()})
             mlflow.log_table(pd.DataFrame(rows), artifact_file="per_question.json")
         print(f"\nLogged to MLflow experiment {name} (run agent-eval-{backend})")
+    if not args.experiment_traces:
+        print(f"Traces in Unity Catalog: {trace_table(cfg)} (tag eval_run = {eval_run})")
 
 
 if __name__ == "__main__":

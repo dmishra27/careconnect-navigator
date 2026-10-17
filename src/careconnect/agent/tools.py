@@ -200,6 +200,7 @@ class Toolbox:
     def __init__(self, tools: list[Tool], attempts: int = 2, retry_delay: float = 1.0):
         self.tools = {t.name: t for t in tools}
         self.attempts, self.retry_delay = attempts, retry_delay
+        self.retries = 0  # failed calls retried so far; the agent tags each trace with its share
 
     def schemas(self) -> list[dict]:
         return [t.schema() for t in self.tools.values()]
@@ -215,6 +216,7 @@ class Toolbox:
                 if attempt == self.attempts:
                     raise
                 span.set_attribute("retried", True)
+                self.retries += 1
                 time.sleep(self.retry_delay)
         raise AssertionError("unreachable")
 

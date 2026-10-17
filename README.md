@@ -242,6 +242,9 @@ uv run agent --demo
 uv run agent --safety-demo
 uv run python -m careconnect.evals.agent --env dev
 
+# 9. Analyse the agent's traces in Unity Catalog with SQL (latency per tool, guardrails, retries)
+uv run python -m careconnect.agent.trace_report --env dev
+
 # Or run the deployed jobs
 databricks bundle run ingest_job -t dev
 databricks bundle run phs_job -t dev

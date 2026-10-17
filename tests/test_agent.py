@@ -136,6 +136,28 @@ def test_agent_stops_after_max_steps():
     assert len(result.tool_calls) == 3
 
 
+def test_each_trace_is_tagged_with_backend_prompt_outcome_and_case(monkeypatch):
+    import careconnect.agent.loop as loop
+
+    seen = []
+    monkeypatch.setattr(loop, "tag_current_trace", lambda tags: seen.append(tags))
+    client = FakeClient(
+        [
+            NS(content=None, tool_calls=[_tool_call("find_clinic", {"service": "x-ray"})]),
+            NS(content="Inverbrae.", tool_calls=None),
+        ]
+    )
+    agent = Agent(client, "m", _toolbox(), trace_tags={"backend": "direct"})
+    agent.run("x-ray?", tags={"case_id": "a04", "category": "clinics"})
+    tags = seen[-1]
+    assert tags["backend"] == "direct" and tags["model"] == "m" and len(tags["prompt_hash"]) == 12
+    assert (tags["case_id"], tags["stopped"], tags["guard"]) == ("a04", "answer", "none")
+    assert (tags["steps"], tags["tool_calls"], tags["retries"]) == (2, 1, 0)
+
+    Agent(FakeClient([]), "m", _toolbox()).run("I have crushing chest pain")
+    assert (seen[-1]["stopped"], seen[-1]["guard"], seen[-1]["steps"]) == ("urgent", "emergency", 0)
+
+
 def test_a_failed_tool_call_is_retried_once_then_reported():
     from careconnect.agent.tools import Tool
 
@@ -150,7 +172,7 @@ def test_a_failed_tool_call_is_retried_once_then_reported():
     tool = Tool("find_clinic", "d", {"type": "object", "properties": {}}, flaky)
     box = Toolbox([tool], retry_delay=0)
     assert json.loads(box.run("find_clinic", "{}")) == [{"name": "Larbank Health Centre"}]
-    assert len(calls) == 2
+    assert len(calls) == 2 and box.retries == 1
 
     def always_down(**kwargs):
         raise TimeoutError("still busy")
