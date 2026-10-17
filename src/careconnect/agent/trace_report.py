@@ -10,6 +10,7 @@ map) and prints five tables:
   runs     traces per evaluation run and backend: count, mean, median and 95th percentile time
   outcome  how runs ended: answer, urgent guard, no-grounding guard, step limit
   tools    per tool: calls, mean and 95th percentile time, errors, retries
+  time_split  per run: model calls and tool calls, with their mean time (where time goes)
   slowest  the slowest test cases
   prompts  traces per prompt version and fingerprint, with share answered and mean time
            (traces from before the Prompt Registry show version "code")
@@ -28,6 +29,8 @@ from careconnect.ingest.main import _find_config
 _ATTRS = "to_json(s.attributes)"
 _IS_TOOL = f"{_ATTRS} RLIKE 'mlflow[.]spanType[^,}}]*TOOL'"
 _RETRIED = f"{_ATTRS} RLIKE 'retried[^,}}]*true'"
+# a model call is any span that is neither a tool nor the agent's own root span
+_IS_MODEL = f"(NOT ({_IS_TOOL}) AND s.name <> 'careconnect_agent')"
 _SPAN_MS = "(s.end_time_unix_nano - s.start_time_unix_nano) / 1e6"
 
 
@@ -79,6 +82,17 @@ FROM {table} t LATERAL VIEW explode(t.spans) x AS s
 WHERE {_IS_TOOL} {and_where}
 GROUP BY 1
 ORDER BY calls DESC""",
+        "time_split": f"""
+SELECT coalesce(t.tags['eval_run'], '(interactive)') AS eval_run,
+       sum(CASE WHEN {_IS_MODEL} THEN 1 ELSE 0 END) AS model_calls,
+       round(avg(CASE WHEN {_IS_MODEL} THEN {_SPAN_MS} END)) AS model_mean_ms,
+       sum(CASE WHEN {_IS_TOOL} THEN 1 ELSE 0 END) AS tool_calls,
+       round(avg(CASE WHEN {_IS_TOOL} THEN {_SPAN_MS} END)) AS tool_mean_ms,
+       max(t.request_time) AS last_trace
+FROM {table} t LATERAL VIEW explode(t.spans) x AS s {where}
+GROUP BY 1
+ORDER BY last_trace DESC
+LIMIT 15""",
         "slowest": f"""
 SELECT t.tags['case_id'] AS case_id,
        t.tags['category'] AS category,
