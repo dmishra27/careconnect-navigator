@@ -1,4 +1,10 @@
-"""System prompt for the agent. Versioned in Git now; moves to the Prompt Registry later."""
+"""System prompt for the agent.
+
+From Week 4 the prompt the agent uses comes from the Prompt Registry (alias "production",
+see prompt_registry.py). This copy in Git is where new wording is written and reviewed, is
+registered as a new version with `prompt_registry register`, and is the fallback when the
+registry cannot be reached.
+"""
 
 SYSTEM_PROMPT = """\
 You are CareConnect Navigator, an assistant for patients of Firth Valley Health Board, a \

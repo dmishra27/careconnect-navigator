@@ -9,7 +9,7 @@ fixed 999 / NHS 24 message without calling the model, and an answer given withou
 successful tool call is replaced by a standard out-of-scope message.
 
 Every model call and tool call is traced in MLflow (one trace per question), and each trace
-is tagged with the backend, model, prompt fingerprint and outcome (see tracing.py).
+is tagged with the backend, model, prompt version and fingerprint, and outcome (see tracing.py).
 """
 
 from dataclasses import dataclass, field
@@ -52,9 +52,16 @@ class Agent:
         toolbox: Toolbox,
         max_steps: int = MAX_STEPS,
         trace_tags: dict | None = None,
+        system_prompt: str = SYSTEM_PROMPT,
+        prompt_version: str = "code",
     ):
         self.client, self.model, self.toolbox, self.max_steps = client, model, toolbox, max_steps
-        self.trace_tags = {"model": model, "prompt_hash": prompt_hash(SYSTEM_PROMPT)}
+        self.system_prompt, self.prompt_version = system_prompt, prompt_version
+        self.trace_tags = {
+            "model": model,
+            "prompt_hash": prompt_hash(system_prompt),
+            "prompt_version": prompt_version,  # registry version number, or "code"
+        }
         self.trace_tags.update(trace_tags or {})
 
     @mlflow.trace(name="careconnect_agent", span_type="AGENT")
@@ -83,7 +90,7 @@ class Agent:
             return AgentResult(
                 answer=guardrails.URGENT_MESSAGES[urgent], stopped="urgent", guard=urgent
             )
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}, *(history or [])]
+        messages = [{"role": "system", "content": self.system_prompt}, *(history or [])]
         messages.append({"role": "user", "content": question})
         result = AgentResult(answer="")
         for step in range(1, self.max_steps + 1):

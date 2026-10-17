@@ -24,6 +24,8 @@ class ProjectConfig(BaseModel):
     agent_tool_backend: str = "mcp"
     # Agent traces go to Unity Catalog tables named <catalog>.<schema>.<prefix>_* (Week 4)
     agent_trace_prefix: str = "careconnect_agent"
+    # The system prompt lives in the Prompt Registry as <catalog>.<schema>.<name> (Week 4)
+    agent_prompt_name: str = "careconnect_agent_prompt"
 
     @property
     def agent_experiment_name(self) -> str:
@@ -36,6 +38,11 @@ class ProjectConfig(BaseModel):
         careconnect-dev-agent-uc-traces. (Not "-uc": a Week 3 experiment of that name already
         holds traces, and Databricks only links an experiment with no traces to Unity Catalog.)"""
         return f"{self.agent_experiment_name}-uc-traces"
+
+    @property
+    def agent_prompt(self) -> str:
+        """Prompt Registry name, e.g. workspace.careconnect_dev.careconnect_agent_prompt."""
+        return self.table(self.agent_prompt_name)
 
     @property
     def chunks_index(self) -> str:

@@ -8,6 +8,7 @@
   uv run agent --demo --tools mcp-search  # search through the Vector Search MCP too
   uv run agent --list-tools --tools mcp   # show exactly what the model is given
   uv run agent --experiment-traces "..."  # keep traces in the experiment, not Unity Catalog
+  uv run agent --prompt 2 "..."           # a registered prompt version (default: production)
 
 Tool backends:
   direct      our search + UC functions run through the SQL warehouse (fallback)
@@ -74,7 +75,14 @@ def build_tools(cfg: ProjectConfig, w, backend: str = "direct") -> list:
     return [*mcp_tools(vs_mcp, include={index}, rename={index: "search_guidance"}), *tools]
 
 
-def build_agent(cfg: ProjectConfig, model: str | None = None, backend: str = "mcp") -> Agent:
+def build_agent(
+    cfg: ProjectConfig, model: str | None = None, backend: str = "mcp", prompt=None
+) -> Agent:
+    """The agent with its tools and system prompt (default: the "production" prompt version,
+    or the copy in prompts.py if the Prompt Registry cannot be reached)."""
+    from careconnect.agent.prompt_registry import load_system_prompt
+
+    prompt = prompt or load_system_prompt(cfg)
     w = WorkspaceClient()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
@@ -83,7 +91,9 @@ def build_agent(cfg: ProjectConfig, model: str | None = None, backend: str = "mc
         client,
         model or cfg.llm_endpoint,
         Toolbox(build_tools(cfg, w, backend)),
-        trace_tags={"backend": backend},
+        trace_tags={"backend": backend, "prompt_source": prompt.source},
+        system_prompt=prompt.text,
+        prompt_version=prompt.version,
     )
 
 
@@ -157,6 +167,9 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="store traces in the MLflow experiment instead of Unity Catalog",
     )
+    parser.add_argument(
+        "--prompt", default=None, help="prompt version or alias (default: production)"
+    )
     args = parser.parse_args(argv)
     if not (args.question or args.demo or args.safety_demo or args.list_tools):
         parser.error("give a question, --demo, --safety-demo or --list-tools")
@@ -169,7 +182,11 @@ def main(argv: list[str] | None = None) -> None:
     mlflow.openai.autolog()
 
     backend = args.tools or cfg.agent_tool_backend
-    agent = build_agent(cfg, args.model, backend)
+    from careconnect.agent.prompt_registry import PRODUCTION, load_system_prompt
+
+    prompt = load_system_prompt(cfg, args.prompt or PRODUCTION, strict=args.prompt is not None)
+    agent = build_agent(cfg, args.model, backend, prompt=prompt)
+    print(f"prompt: {prompt.describe()}")
     print(f"model: {agent.model}   backend: {backend}   tools: {', '.join(agent.toolbox.tools)}")
     if args.list_tools:
         for tool in agent.toolbox.tools.values():

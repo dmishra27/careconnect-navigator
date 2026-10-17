@@ -72,12 +72,14 @@ def test_tags_are_strings_none_is_dropped_and_tracing_errors_are_swallowed(monke
 def test_report_queries_read_the_unified_table_and_parameterise_the_run():
     table = tracing.trace_table(CFG)
     queries = trace_report.build_queries(table)
-    assert set(queries) == {"runs", "outcome", "tools", "slowest", "prompts"}
+    assert set(queries) == {"runs", "outcome", "tools", "time_split", "slowest", "prompts"}
     assert all(table in q for q in queries.values())
     assert "LATERAL VIEW explode(t.spans)" in queries["tools"]
     assert "RLIKE 'mlflow[.]spanType[^,}]*TOOL'" in queries["tools"]
     assert "RLIKE 'retried[^,}]*true'" in queries["tools"]
     assert "explode(t.spans)" in trace_report.inspect_query(table)
+    assert "s.name <> 'careconnect_agent'" in queries["time_split"]
+    assert "t.tags['prompt_version'], 'code'" in queries["prompts"]  # older traces: "code"
     assert ":eval_run" not in queries["runs"]
     filtered = trace_report.build_queries(table, "mcp-20261017-101500")
     assert all(":eval_run" in q for q in filtered.values())
