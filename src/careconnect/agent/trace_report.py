@@ -3,6 +3,7 @@
   uv run python -m careconnect.agent.trace_report --env dev                  # all traces
   uv run python -m careconnect.agent.trace_report --env dev --eval-run mcp-20261017-101500
   uv run python -m careconnect.agent.trace_report --env dev --show-sql       # print the SQL
+  uv run python -m careconnect.agent.trace_report --env dev --inspect        # span details
 
 Reads `<catalog>.<schema>.<prefix>_trace_unified` (one row per trace, spans nested, tags as a
 map) and prints five tables:
@@ -20,9 +21,25 @@ from careconnect.agent.tracing import trace_table
 from careconnect.config import ProjectConfig
 from careconnect.ingest.main import _find_config
 
-# MLflow stores span attributes as JSON text, so a span type reads as "TOOL" with quotes
-_SPAN_TYPE = "replace(s.attributes:`mlflow.spanType`::string, '\"', '')"
+# Span attributes are a VARIANT whose values MLflow writes as JSON text ("\"TOOL\""), and a
+# path lookup on a key with a dot (mlflow.spanType) returned nothing on 17 Oct. Matching the
+# attributes' JSON text works whatever the quoting or nesting.
+_ATTRS = "to_json(s.attributes)"
+_IS_TOOL = f"{_ATTRS} RLIKE 'mlflow[.]spanType[^,}}]*TOOL'"
+_RETRIED = f"{_ATTRS} RLIKE 'retried[^,}}]*true'"
 _SPAN_MS = "(s.end_time_unix_nano - s.start_time_unix_nano) / 1e6"
+
+
+def inspect_query(table: str) -> str:
+    """What the spans look like: names, counts and a sample of raw attributes."""
+    return f"""
+SELECT s.name AS span,
+       count(*) AS spans,
+       left(first({_ATTRS}), 250) AS sample_attributes
+FROM {table} t LATERAL VIEW explode(t.spans) x AS s
+GROUP BY 1
+ORDER BY spans DESC
+LIMIT 20"""
 
 
 def build_queries(table: str, eval_run: str | None = None) -> dict[str, str]:
@@ -56,10 +73,9 @@ SELECT s.name AS tool,
        round(avg({_SPAN_MS})) AS mean_ms,
        round(percentile_approx({_SPAN_MS}, 0.95)) AS p95_ms,
        sum(CASE WHEN s.status.code LIKE '%ERROR%' THEN 1 ELSE 0 END) AS errors,
-       sum(CASE WHEN lower(s.attributes:retried::string) LIKE '%true%' THEN 1 ELSE 0 END)
-         AS retried
+       sum(CASE WHEN {_RETRIED} THEN 1 ELSE 0 END) AS retried
 FROM {table} t LATERAL VIEW explode(t.spans) x AS s
-WHERE {_SPAN_TYPE} = 'TOOL' {and_where}
+WHERE {_IS_TOOL} {and_where}
 GROUP BY 1
 ORDER BY calls DESC""",
         "slowest": f"""
@@ -126,6 +142,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--config", default=None)
     parser.add_argument("--eval-run", default=None, help="only this evaluation run")
     parser.add_argument("--show-sql", action="store_true")
+    parser.add_argument("--inspect", action="store_true", help="also list span names, attributes")
     args = parser.parse_args(argv)
 
     cfg = ProjectConfig.from_yaml(args.config or _find_config(), env=args.env)
@@ -133,12 +150,16 @@ def main(argv: list[str] | None = None) -> None:
     params = {"eval_run": args.eval_run} if args.eval_run else {}
     w = WorkspaceClient()
     print(f"Traces: {table}" + (f"   eval_run: {args.eval_run}" if args.eval_run else ""))
-    for title, sql in build_queries(table, args.eval_run).items():
+    queries = build_queries(table, args.eval_run)
+    if args.inspect:
+        queries["spans (inspect)"] = inspect_query(table)
+    for title, sql in queries.items():
         print(f"\n{title}")
         if args.show_sql:
             print(sql)
         try:
-            print(format_table(*run_sql(w, sql, params)))
+            used = params if ":eval_run" in sql else {}
+            print(format_table(*run_sql(w, sql, used)))
         except Exception as exc:  # noqa: BLE001 - one failing query should not hide the rest
             print(f"   ERROR {str(exc)[:300]}")
 

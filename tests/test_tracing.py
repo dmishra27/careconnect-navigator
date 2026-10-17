@@ -75,7 +75,9 @@ def test_report_queries_read_the_unified_table_and_parameterise_the_run():
     assert set(queries) == {"runs", "outcome", "tools", "slowest", "prompts"}
     assert all(table in q for q in queries.values())
     assert "LATERAL VIEW explode(t.spans)" in queries["tools"]
-    assert "= 'TOOL'" in queries["tools"] and "retried" in queries["tools"]
+    assert "RLIKE 'mlflow[.]spanType[^,}]*TOOL'" in queries["tools"]
+    assert "RLIKE 'retried[^,}]*true'" in queries["tools"]
+    assert "explode(t.spans)" in trace_report.inspect_query(table)
     assert ":eval_run" not in queries["runs"]
     filtered = trace_report.build_queries(table, "mcp-20261017-101500")
     assert all(":eval_run" in q for q in filtered.values())
