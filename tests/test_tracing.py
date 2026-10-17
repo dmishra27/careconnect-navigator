@@ -28,7 +28,7 @@ def test_experiment_traces_go_to_unity_catalog_tables_with_our_prefix(monkeypatc
     monkeypatch.setattr(mlflow, "set_tracking_uri", lambda uri: None)
     monkeypatch.setattr(mlflow, "set_experiment", lambda name, **kw: calls.append((name, kw)))
     name = tracing.setup_agent_experiment(CFG, "me@example.com")
-    assert name == "/Users/me@example.com/careconnect-dev-agent-uc"
+    assert name == "/Users/me@example.com/careconnect-dev-agent-uc-traces"
     location = calls[0][1]["trace_location"]
     assert (location.catalog_name, location.schema_name, location.table_prefix) == (
         "workspace",
@@ -36,6 +36,16 @@ def test_experiment_traces_go_to_unity_catalog_tables_with_our_prefix(monkeypatc
         "careconnect_agent",
     )
     assert tracing.trace_table(CFG) == "workspace.careconnect_dev.careconnect_agent_trace_unified"
+
+
+def test_an_experiment_that_already_holds_traces_gets_a_clear_message(monkeypatch):
+    def refuse(name, **kw):
+        raise RuntimeError("BAD_REQUEST: Experiment 42 already contains traces. ...")
+
+    monkeypatch.setattr(mlflow, "set_tracking_uri", lambda uri: None)
+    monkeypatch.setattr(mlflow, "set_experiment", refuse)
+    with pytest.raises(RuntimeError, match="--experiment-traces"):
+        tracing.setup_agent_experiment(CFG, "me")
 
 
 def test_experiment_storage_remains_as_a_fallback(monkeypatch):

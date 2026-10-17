@@ -32,8 +32,10 @@ class ProjectConfig(BaseModel):
 
     @property
     def agent_uc_experiment_name(self) -> str:
-        """Experiment whose traces are stored in Unity Catalog, e.g. careconnect-dev-agent-uc."""
-        return f"{self.agent_experiment_name}-uc"
+        """Experiment whose traces are stored in Unity Catalog, e.g.
+        careconnect-dev-agent-uc-traces. (Not "-uc": a Week 3 experiment of that name already
+        holds traces, and Databricks only links an experiment with no traces to Unity Catalog.)"""
+        return f"{self.agent_experiment_name}-uc-traces"
 
     @property
     def chunks_index(self) -> str:

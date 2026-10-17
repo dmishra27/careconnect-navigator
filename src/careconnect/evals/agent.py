@@ -10,7 +10,7 @@ Checks are deterministic (no LLM judge yet), so a run is cheap, repeatable and e
   uv run python -m careconnect.evals.agent --env dev --tools direct  # compare backends
   uv run python -m careconnect.evals.agent --env dev --experiment-traces  # old trace storage
 
-Results go to MLflow (experiment <experiment_name>-agent-uc, runs agent-eval-*) with a
+Results go to MLflow (experiment <experiment_name>-agent-uc-traces, runs agent-eval-*) with a
 per-question table. Every agent call is traced to Unity Catalog tables and tagged with
 case_id, category and eval_run, so trace_report.py can analyse a run with SQL.
 """

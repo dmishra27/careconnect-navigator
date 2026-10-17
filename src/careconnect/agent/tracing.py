@@ -38,14 +38,22 @@ def setup_agent_experiment(cfg: ProjectConfig, user_name: str, uc: bool = True) 
     from mlflow.entities.trace_location import UnityCatalog
 
     name = f"/Users/{user_name}/{cfg.agent_uc_experiment_name}"
-    mlflow.set_experiment(
-        name,
-        trace_location=UnityCatalog(
-            catalog_name=cfg.catalog,
-            schema_name=cfg.schema_name,
-            table_prefix=cfg.agent_trace_prefix,
-        ),
+    location = UnityCatalog(
+        catalog_name=cfg.catalog,
+        schema_name=cfg.schema_name,
+        table_prefix=cfg.agent_trace_prefix,
     )
+    try:
+        mlflow.set_experiment(name, trace_location=location)
+    except Exception as exc:
+        if "already contains traces" in str(exc):
+            raise RuntimeError(
+                f"Experiment {name} already holds traces stored outside Unity Catalog, and "
+                "Databricks only links an experiment with no traces. Delete or rename it in "
+                "the MLflow UI, or change agent_uc_experiment_name; run with "
+                "--experiment-traces to keep working meanwhile."
+            ) from exc
+        raise
     return name
 
 
