@@ -158,6 +158,24 @@ def test_each_trace_is_tagged_with_backend_prompt_outcome_and_case(monkeypatch):
     assert (seen[-1]["stopped"], seen[-1]["guard"], seen[-1]["steps"]) == ("urgent", "emergency", 0)
 
 
+def test_the_agent_uses_the_prompt_it_is_given_and_tags_its_version(monkeypatch):
+    import careconnect.agent.loop as loop
+
+    seen = []
+    monkeypatch.setattr(loop, "tag_current_trace", lambda tags: seen.append(tags))
+    client = FakeClient(
+        [
+            NS(content=None, tool_calls=[_tool_call("find_clinic", {"service": "x-ray"})]),
+            NS(content="Inverbrae.", tool_calls=None),
+        ]
+    )
+    Agent(client, "m", _toolbox(), system_prompt="Version two.", prompt_version="2").run("x?")
+    assert client.sent[0]["messages"][0] == {"role": "system", "content": "Version two."}
+    assert seen[-1]["prompt_version"] == "2"
+    assert seen[-1]["prompt_hash"] == loop.prompt_hash("Version two.")
+    assert Agent(FakeClient([]), "m", _toolbox()).trace_tags["prompt_version"] == "code"
+
+
 def test_a_failed_tool_call_is_retried_once_then_reported():
     from careconnect.agent.tools import Tool
 

@@ -78,6 +78,7 @@ def test_report_queries_read_the_unified_table_and_parameterise_the_run():
     assert "RLIKE 'mlflow[.]spanType[^,}]*TOOL'" in queries["tools"]
     assert "RLIKE 'retried[^,}]*true'" in queries["tools"]
     assert "explode(t.spans)" in trace_report.inspect_query(table)
+    assert "t.tags['prompt_version'], 'code'" in queries["prompts"]  # older traces: "code"
     assert ":eval_run" not in queries["runs"]
     filtered = trace_report.build_queries(table, "mcp-20261017-101500")
     assert all(":eval_run" in q for q in filtered.values())

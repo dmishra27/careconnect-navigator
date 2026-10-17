@@ -66,7 +66,7 @@ flowchart TB
 
     subgraph LLM["LLMOps"]
         AG["Agent: Llama 3.3 70B, hand-written tool loop<br/>urgent-symptom and grounding guards in code"]
-        MLF["MLflow: traces, retrieval and agent evaluation<br/>LLM judges, Prompt Registry (planned)"]
+        MLF["MLflow: traces, retrieval and agent evaluation<br/>LLM judges, Prompt Registry"]
     end
 
     subgraph INF["Inference"]
@@ -153,7 +153,7 @@ on any word ("eye operations" finds Ophthalmology), and one retry for a failed t
 are repeated three times because answers vary between runs even at temperature 0. The prompt was
 tuned on these same 28 cases, so a fresh, unseen set comes next.
 
-**Engineering.** 176 unit tests and 2 integration tests, with lint and unit tests run by GitHub
+**Engineering.** 199 unit tests and 2 integration tests, with lint and unit tests run by GitHub
 Actions on every pull request; two serverless jobs (`ingest_job`, `phs_job` with an `agent_tools`
 task) deployed by the bundle; 5 decision records.
 
@@ -245,6 +245,12 @@ uv run python -m careconnect.evals.agent --env dev
 # 9. Analyse the agent's traces in Unity Catalog with SQL (latency per tool, guardrails, retries)
 uv run python -m careconnect.agent.trace_report --env dev
 
+# 10. The system prompt in the Prompt Registry: register it once as "production", then every
+#     new wording becomes a version that is promoted only if 3 evaluation runs score as well
+uv run python -m careconnect.agent.prompt_registry --env dev register --set-production
+uv run python -m careconnect.agent.prompt_registry --env dev show
+uv run python -m careconnect.agent.prompt_registry --env dev promote --candidate 2
+
 # Or run the deployed jobs
 databricks bundle run ingest_job -t dev
 databricks bundle run phs_job -t dev
@@ -263,7 +269,7 @@ uv run pytest -m "not integration"
   loop, safety guardrails, agent evaluation (25 of 28, then 28 of 28 in three runs after fixes)
 - [Decision records](docs/decisions/): workspace layout, retrieval query type and chunk size, no
   internet on Free Edition jobs, MLflow trace storage, agent tool backend (MCP), serverless
-  environment 6
+  environment 6, Prompt Registry with an evaluation gate
 - [Project progress tracker](https://claude.ai/code/artifact/93fe6141-72c6-4c91-9ea3-47d1c7581c25):
   goals, roadmap, step-by-step status, architecture
 
@@ -274,7 +280,7 @@ uv run pytest -m "not integration"
 | 1 | Foundations: workspace, CLI, traced LLM call, bundle, tooling | Done |
 | 2 | Data and knowledge processing: ingest, search index, retrieval evaluation, PHS data quality | Done |
 | 3 | MCP, tool calling and agent orchestration: UC function tools over managed MCP, agent loop with citations, safety guardrails, agent evaluation | Done |
-| 4 | Prompt Registry, agent and models in Unity Catalog, traces in Unity Catalog | Next |
+| 4 | MLflow for GenAI: traces in Unity Catalog, Prompt Registry with an evaluation gate, LLM judges, agent in Unity Catalog, feedback | In progress |
 | 5 | Model Serving, CI/CD with GitHub Actions | Planned |
 | 6 | Monitoring and feedback loop | Planned |
 | 7 | Production deployment and write-up | Planned |

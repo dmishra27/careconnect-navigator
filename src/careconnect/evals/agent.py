@@ -9,6 +9,7 @@ Checks are deterministic (no LLM judge yet), so a run is cheap, repeatable and e
   uv run python -m careconnect.evals.agent --env dev                 # default tool backend
   uv run python -m careconnect.evals.agent --env dev --tools direct  # compare backends
   uv run python -m careconnect.evals.agent --env dev --experiment-traces  # old trace storage
+  uv run python -m careconnect.evals.agent --env dev --prompt 2      # a registered prompt version
 
 Results go to MLflow (experiment <experiment_name>-agent-uc-traces, runs agent-eval-*) with a
 per-question table. Every agent call is traced to Unity Catalog tables and tagged with
@@ -120,7 +121,14 @@ def summarise(rows: list[dict]) -> dict:
     return metrics
 
 
-def run_cases(agent, cases: list[Case], eval_run: str | None = None) -> list[dict]:
+def default_cases_path() -> Path:
+    return _find_config().parent / "data" / "eval" / "agent_questions.yml"
+
+
+def run_cases(
+    agent, cases: list[Case], eval_run: str | None = None, quiet: bool = False
+) -> list[dict]:
+    """Ask every question and score it. quiet=True prints only the failures."""
     rows = []
     for case in cases:
         start = time.perf_counter()
@@ -129,18 +137,53 @@ def run_cases(agent, cases: list[Case], eval_run: str | None = None) -> list[dic
         row = score_case(case, result.answer, [c.name for c in result.tool_calls], result.guard)
         row.update(seconds=round(time.perf_counter() - start, 2), steps=result.steps)
         rows.append(row)
-        print(f"  {case.id:<4} {'PASS' if row['passed'] else 'FAIL'}  {row['failures']}")
+        if not (quiet and row["passed"]):
+            print(f"  {case.id:<4} {'PASS' if row['passed'] else 'FAIL'}  {row['failures']}")
         if not row["passed"]:  # show the answer so a reviewer can tell agent from label errors
             print("        answer: " + " ".join(result.answer.split())[:400])
     return rows
 
 
-def main(argv: list[str] | None = None) -> None:
+def evaluate(
+    agent,
+    cases: list[Case],
+    backend: str,
+    eval_run: str,
+    log_mlflow: bool = True,
+    run_name: str | None = None,
+    tags: dict | None = None,
+    quiet: bool = False,
+) -> dict:
+    """One evaluation run: ask every case, score it, log the run to MLflow; returns metrics."""
     import mlflow
     import pandas as pd
+
+    rows = run_cases(agent, cases, eval_run, quiet=quiet)
+    metrics = summarise(rows)
+    if log_mlflow:
+        with mlflow.start_run(run_name=run_name or f"agent-eval-{backend}"):
+            mlflow.set_tags({"stage": "week4-agent-eval", "eval_run": eval_run, **(tags or {})})
+            mlflow.log_params(
+                {
+                    "backend": backend,
+                    "model": agent.model,
+                    "cases": len(cases),
+                    "prompt_hash": agent.trace_tags["prompt_hash"],
+                    "prompt_version": agent.trace_tags.get("prompt_version", "code"),
+                    "eval_run": eval_run,
+                }
+            )
+            mlflow.log_metrics({k: float(v) for k, v in metrics.items()})
+            mlflow.log_table(pd.DataFrame(rows), artifact_file="per_question.json")
+    return metrics
+
+
+def main(argv: list[str] | None = None) -> None:
+    import mlflow
     from databricks.sdk import WorkspaceClient
 
     from careconnect.agent.main import build_agent
+    from careconnect.agent.prompt_registry import PRODUCTION, load_system_prompt
 
     parser = argparse.ArgumentParser(description="Evaluate the CareConnect agent")
     parser.add_argument("--env", default="dev")
@@ -150,6 +193,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--cases", default=None)
     parser.add_argument("--only", default=None, help="comma-separated case ids")
     parser.add_argument(
+        "--prompt", default=None, help="prompt version or alias (default: production)"
+    )
+    parser.add_argument(
         "--experiment-traces",
         action="store_true",
         help="store traces in the MLflow experiment instead of Unity Catalog",
@@ -158,9 +204,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     cfg = ProjectConfig.from_yaml(args.config or _find_config(), env=args.env)
-    cases = load_cases(
-        args.cases or _find_config().parent / "data" / "eval" / "agent_questions.yml"
-    )
+    cases = load_cases(args.cases or default_cases_path())
     if args.only:
         wanted = set(args.only.split(","))
         cases = [c for c in cases if c.id in wanted]
@@ -173,31 +217,19 @@ def main(argv: list[str] | None = None) -> None:
     name = experiment.rsplit("/", 1)[-1]
     mlflow.openai.autolog()
 
-    agent = build_agent(cfg, args.model, backend)
+    # an explicitly requested version must exist; the default falls back to prompts.py
+    prompt = load_system_prompt(cfg, args.prompt or PRODUCTION, strict=args.prompt is not None)
+    agent = build_agent(cfg, args.model, backend, prompt=prompt)
     # one label per evaluation run, on every trace and on the MLflow run, so SQL can join them
     eval_run = f"{backend}-{time.strftime('%Y%m%d-%H%M%S')}"
+    print(f"prompt: {prompt.describe()}")
     print(f"model: {agent.model}   backend: {backend}   cases: {len(cases)}   eval_run: {eval_run}")
-    rows = run_cases(agent, cases, eval_run)
-    metrics = summarise(rows)
+    metrics = evaluate(agent, cases, backend, eval_run, log_mlflow=not args.no_mlflow)
 
     print("\nSummary")
     for key, value in metrics.items():
         print(f"  {key:<28}{value:.3f}" if isinstance(value, float) else f"  {key:<28}{value}")
-
     if not args.no_mlflow:
-        with mlflow.start_run(run_name=f"agent-eval-{backend}"):
-            mlflow.set_tags({"stage": "week4-agent-eval", "eval_run": eval_run})
-            mlflow.log_params(
-                {
-                    "backend": backend,
-                    "model": agent.model,
-                    "cases": len(cases),
-                    "prompt_hash": agent.trace_tags["prompt_hash"],
-                    "eval_run": eval_run,
-                }
-            )
-            mlflow.log_metrics({k: float(v) for k, v in metrics.items()})
-            mlflow.log_table(pd.DataFrame(rows), artifact_file="per_question.json")
         print(f"\nLogged to MLflow experiment {name} (run agent-eval-{backend})")
     if not args.experiment_traces:
         print(f"Traces in Unity Catalog: {trace_table(cfg)} (tag eval_run = {eval_run})")

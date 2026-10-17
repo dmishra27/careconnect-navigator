@@ -11,7 +11,8 @@ map) and prints five tables:
   outcome  how runs ended: answer, urgent guard, no-grounding guard, step limit
   tools    per tool: calls, mean and 95th percentile time, errors, retries
   slowest  the slowest test cases
-  prompts  traces per prompt fingerprint (prompt_hash), so prompt versions can be compared
+  prompts  traces per prompt version and fingerprint, with share answered and mean time
+           (traces from before the Prompt Registry show version "code")
 """
 
 import argparse
@@ -90,12 +91,16 @@ GROUP BY 1, 2
 ORDER BY mean_s DESC
 LIMIT 10""",
         "prompts": f"""
-SELECT coalesce(t.tags['prompt_hash'], '?') AS prompt_hash,
+SELECT coalesce(t.tags['prompt_version'], 'code') AS prompt_version,
+       coalesce(t.tags['prompt_hash'], '?') AS prompt_hash,
        count(*) AS traces,
+       round(100 * avg(CASE WHEN t.tags['stopped'] = 'answer' THEN 1 ELSE 0 END), 1)
+         AS answered_pct,
+       round(avg(t.execution_duration_ms) / 1000, 2) AS mean_s,
        min(t.request_time) AS first_seen,
        max(t.request_time) AS last_seen
 FROM {table} t {where}
-GROUP BY 1
+GROUP BY 1, 2
 ORDER BY last_seen DESC""",
     }
 
