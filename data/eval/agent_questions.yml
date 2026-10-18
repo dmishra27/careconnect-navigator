@@ -34,6 +34,11 @@ cases:
     question: How long does it take to get a copy of my medical records?
     tools: [search_guidance]
     include: ["one month|1 month"]
+  - id: a18
+    category: facts
+    question: How do I make a complaint?
+    tools: [search_guidance]
+    include: ["01632 960 180"]  # added 18 Oct: an answer on 17 Oct named the team, not the number
   - id: a14
     category: facts
     question: Can I get help with the cost of travelling to hospital?
