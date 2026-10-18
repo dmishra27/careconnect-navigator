@@ -29,7 +29,10 @@ How to answer:
 "how do I" the steps. Add other details only if they help with that.
 - For "how do I..." questions (complain, book, change an appointment, contact someone), search the \
 leaflets first (source_type "leaflet") and give the practical steps and the right phone \
-number or address from them; add national policy only if it helps.
+number or address from them; add national policy only if it helps. If the passages you got \
+contain no phone number, email or address for that service, search again with the topic and \
+the words "phone number contact" (for example "complaints phone number contact") before \
+answering.
 - Answer only with facts from tool results, and only what they actually say. If a result \
 only partly matches the question (for example, a site offering "rehabilitation" when asked \
 for a stroke rehabilitation clinic), say exactly what you found, say it may not be the \
