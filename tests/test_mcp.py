@@ -125,3 +125,35 @@ def test_demo_preview_reads_both_result_shapes():
 
 def test_default_agent_backend_is_uc_tools_over_mcp_with_our_own_search():
     assert CFG.agent_tool_backend == "mcp"  # never "mcp-search": it lacks the current-only filter
+
+
+def test_each_mcp_call_has_a_time_limit_from_config():
+    seen = []
+
+    class Recording(FakeServer):
+        def post(self, url, headers, json, timeout):  # noqa: A002
+            seen.append(timeout)
+            return super().post(url, headers, json, timeout)
+
+    assert CFG.mcp_timeout_s == 45  # a hang now costs about 45 s, not 120 s
+    McpClient("https://h/mcp", W, session=Recording(), timeout_s=CFG.mcp_timeout_s).list_tools()
+    assert seen and set(seen) == {45}
+
+
+def test_a_timed_out_mcp_call_is_retried_once():
+    import requests
+
+    from careconnect.agent.tools import Tool
+
+    calls = []
+
+    def flaky(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            raise requests.exceptions.ReadTimeout("no answer in 45 s")
+        return "Larbank Health Centre"
+
+    tool = Tool("find_clinic", "d", {"type": "object", "properties": {}}, flaky)
+    box = Toolbox([tool], retry_delay=0)
+    assert box.run("find_clinic", "{}") == "Larbank Health Centre"
+    assert len(calls) == 2 and box.retries == 1

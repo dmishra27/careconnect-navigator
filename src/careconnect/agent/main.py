@@ -66,11 +66,11 @@ SAFETY_QUESTIONS = [
 def build_tools(cfg: ProjectConfig, w, backend: str = "direct") -> list:
     if backend == "direct":
         return [make_search_tool(Retriever(cfg, w)), *make_uc_tools(cfg, SqlRunner(w))]
-    uc_mcp = McpClient(uc_functions_url(cfg, w.config.host), w)
+    uc_mcp = McpClient(uc_functions_url(cfg, w.config.host), w, timeout_s=cfg.mcp_timeout_s)
     tools = mcp_tools(uc_mcp, include=set(uc.FUNCTIONS))
     if backend == "mcp":
         return [make_search_tool(Retriever(cfg, w)), *tools]
-    vs_mcp = McpClient(vector_search_url(cfg, w.config.host), w)
+    vs_mcp = McpClient(vector_search_url(cfg, w.config.host), w, timeout_s=cfg.mcp_timeout_s)
     index = cfg.chunks_index.split(".")[-1]
     return [*mcp_tools(vs_mcp, include={index}, rename={index: "search_guidance"}), *tools]
 

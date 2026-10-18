@@ -1,8 +1,8 @@
 # The system prompt in the Prompt Registry, promoted only through an evaluation gate
 
 - Date: 2026-10-17
-- Status: proposed (accepted once version 1 is registered as production and a candidate has
-  been through the gate on Databricks)
+- Status: accepted (17 October: version 1 registered as production and scored 28 of 28; a
+  weaker candidate was kept out by the gate, see Evidence)
 
 ## Context
 
@@ -56,3 +56,18 @@ an easy bar. Three runs each is the same rule used to close Week 3.
 - A promotion costs 6 evaluation runs (about 15 to 20 minutes and 6 x 28 agent calls).
 - The gate uses the rule-based checks only. Step 3 adds LLM judges (correctness, groundedness,
   safety); when they are stable they can join the gate.
+
+## Evidence (17 October)
+
+| Check | Result |
+|-------|--------|
+| Version 1 registered from `prompts.py` | hash `66201762873b`, the same as the code; alias `production` set |
+| Agent and evaluation load version 1 | `prompt: version 1 from the Prompt Registry`; 28 of 28 |
+| Candidate version 2 | `prompts.py` without the two rules that fixed a13 (hash `ab36e99547fa`) |
+| Gate, dry run, 3 runs each | production 1.000, 1.000, 1.000; candidate 1.000, 1.000, 0.964 (a13 failed) |
+| Gate decision | `FAIL pass_rate: candidate worst 0.964 < production worst 1.000`; version 1 kept |
+| Traces by version | version 1: 113, version 2: 84, `code` (before the registry): 29 |
+
+A single-run check would have passed the weaker candidate in two runs out of three. The gate
+runs also showed that some Unity Catalog function calls over MCP hang until the client timeout
+(21 retries, 0 errors), which made a promotion take 66 minutes; the timeout is now 45 s.

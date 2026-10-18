@@ -26,6 +26,10 @@ class ProjectConfig(BaseModel):
     agent_trace_prefix: str = "careconnect_agent"
     # The system prompt lives in the Prompt Registry as <catalog>.<schema>.<name> (Week 4)
     agent_prompt_name: str = "careconnect_agent_prompt"
+    # Seconds to wait for one MCP call before giving up (the Toolbox then retries once). A
+    # normal lookup takes about 3 s and the slowest healthy one seen took 37.8 s (a03, warehouse
+    # start-up); on 17 Oct some calls hung until the old 120 s limit, so a hang cost minutes.
+    mcp_timeout_s: int = 45
 
     @property
     def agent_experiment_name(self) -> str:

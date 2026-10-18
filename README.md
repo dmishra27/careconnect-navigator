@@ -267,6 +267,8 @@ uv run pytest -m "not integration"
 - [Week 2 summary](docs/week2.md)
 - [Week 3 report](docs/week3_report.md): tools as Unity Catalog functions over managed MCP, agent
   loop, safety guardrails, agent evaluation (25 of 28, then 28 of 28 in three runs after fixes)
+- [Week 4 report](docs/week4_report.md) (in progress): serverless environment 6, agent traces in
+  Unity Catalog with an SQL report, Prompt Registry with an evaluation gate
 - [Decision records](docs/decisions/): workspace layout, retrieval query type and chunk size, no
   internet on Free Edition jobs, MLflow trace storage, agent tool backend (MCP), serverless
   environment 6, Prompt Registry with an evaluation gate

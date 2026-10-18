@@ -27,7 +27,7 @@ class McpError(RuntimeError):
 
 
 class McpClient:
-    def __init__(self, url: str, w, session=None, timeout_s: int = 120):
+    def __init__(self, url: str, w, session=None, timeout_s: int = 45):
         self.url, self.w, self.timeout_s = url, w, timeout_s
         self.http = session or requests.Session()
         self.session_id: str | None = None
