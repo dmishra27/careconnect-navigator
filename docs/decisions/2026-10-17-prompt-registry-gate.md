@@ -71,3 +71,27 @@ an easy bar. Three runs each is the same rule used to close Week 3.
 A single-run check would have passed the weaker candidate in two runs out of three. The gate
 runs also showed that some Unity Catalog function calls over MCP hang until the client timeout
 (21 retries, 0 errors), which made a promotion take 66 minutes; the timeout is now 45 s.
+
+## First real promotion: version 3 (18 and 19 October)
+
+The new case a18 ("How do I make a complaint?") failed on version 1: for "make a complaint" the
+section with the Complaints Team number ranks 7th, outside the top 5 passages, while
+"complaints phone number contact" ranks it 1st. Version 3 adds one rule: for a "how do I"
+question with no phone number, email or address in the passages, search again with the topic and
+"phone number contact".
+
+| Check | Result |
+|-------|--------|
+| Gate, 3 runs each (29 cases) | version 1: 0.966, 0.897, 0.862; version 3: 0.931, 0.897, 0.897 |
+| a18 | failed 3 of 3 on version 1; passed 3 of 3 on version 3 |
+| Gate decision | all 5 checks ok; version 3 promoted, version 1 kept as `previous` |
+| Confirmation run, 19 Oct | 29 of 29 on version 3, 5.5 s per question; `prompts.py` matches production |
+
+**Lesson.** During runs 2 to 6 of the gate the Unity Catalog function lookups over MCP were slow
+(mean 22 to 51 s per question) and several clinic and waiting-times questions got the standard
+"could not find an answer" reply in both versions. Those failures, not the prompt, set most of the
+scores, so the margin (0.897 against 0.862) was mostly noise; only a18 measured the prompt. A
+clean confirmation run was therefore required before merging. Planned change: the gate reports
+"inconclusive, re-run" when a run has failed or retried tool calls or abnormal times, instead of
+deciding on them.
+
