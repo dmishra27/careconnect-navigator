@@ -281,5 +281,6 @@ def test_prompt_sets_the_waiting_time_rules():
         '"how long" needs the time it takes',  # a13: answer what was asked
         "Never mention tools, functions",  # o02
         'say plainly "I do not know"',  # o02
+        'search again with the topic and the words "phone number contact"',  # a18
     ):
         assert rule in SYSTEM_PROMPT
