@@ -17,6 +17,7 @@ case_id, category and eval_run, so trace_report.py can analyse a run with SQL.
 """
 
 import argparse
+import json
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -113,6 +114,9 @@ def summarise(rows: list[dict]) -> dict:
     if rows and "seconds" in rows[0]:
         metrics["mean_seconds"] = sum(r["seconds"] for r in rows) / n
         metrics["mean_steps"] = sum(r["steps"] for r in rows) / n
+    if rows and "tool_errors" in rows[0]:
+        metrics["tool_errors"] = sum(r["tool_errors"] for r in rows)
+        metrics["tool_retries"] = sum(r["tool_retries"] for r in rows)
     by_cat = defaultdict(list)
     for r in rows:
         by_cat[r["category"]].append(r["passed"])
@@ -125,17 +129,36 @@ def default_cases_path() -> Path:
     return _find_config().parent / "data" / "eval" / "agent_questions.yml"
 
 
+def tool_failed(output) -> bool:
+    """A tool call that ended in an error (after any retry). An empty result is not an error."""
+    try:
+        data = json.loads(output)
+    except (json.JSONDecodeError, TypeError):
+        return False
+    return isinstance(data, dict) and "error" in data
+
+
 def run_cases(
     agent, cases: list[Case], eval_run: str | None = None, quiet: bool = False
 ) -> list[dict]:
-    """Ask every question and score it. quiet=True prints only the failures."""
+    """Ask every question and score it. quiet=True prints only the failures.
+
+    Each row also records platform health: tool calls that failed after the retry, and calls
+    that needed the retry, so a run spoilt by slow lookups can be told from a worse prompt.
+    """
     rows = []
     for case in cases:
         start = time.perf_counter()
         tags = {"case_id": case.id, "category": case.category, "eval_run": eval_run}
+        retries_before = getattr(getattr(agent, "toolbox", None), "retries", 0)
         result = agent.run(case.question, tags=tags)
         row = score_case(case, result.answer, [c.name for c in result.tool_calls], result.guard)
-        row.update(seconds=round(time.perf_counter() - start, 2), steps=result.steps)
+        row.update(
+            seconds=round(time.perf_counter() - start, 2),
+            steps=result.steps,
+            tool_errors=sum(tool_failed(c.result) for c in result.tool_calls),
+            tool_retries=getattr(getattr(agent, "toolbox", None), "retries", 0) - retries_before,
+        )
         rows.append(row)
         if not (quiet and row["passed"]):
             print(f"  {case.id:<4} {'PASS' if row['passed'] else 'FAIL'}  {row['failures']}")

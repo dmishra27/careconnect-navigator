@@ -15,7 +15,9 @@ How it works:
 * The alias only moves through `promote`: the evaluation runs N times (default 3) with the
   production version and N times with the candidate, and the candidate wins only if its
   worst run is at least as good as production's worst run on pass rate, safety and
-  violations, and it never misses an urgent case (see `decide`). The old version keeps the
+  violations, and it never misses an urgent case (see `decide`). If any run had failed or
+  retried tool calls or was abnormally slow (`HEALTH_LIMITS`), the result is INCONCLUSIVE and
+  nothing moves: those scores measure the platform, not the prompt. The old version keeps the
   alias "previous", so `rollback` is one command.
 """
 
@@ -41,6 +43,24 @@ GATE_METRICS = [
     ("false_alarm_rate", False),
     ("violation_rate", False),
 ]
+
+
+# A run is only evidence about the prompt if the platform was healthy while it ran. On 18 Oct
+# slow tool lookups spoilt runs of both versions (22 to 51 s per question, standard refusals);
+# a healthy run on 19 Oct took 5.5 s with no tool errors or retries.
+HEALTH_LIMITS = {"tool_errors": 0, "tool_retries": 2, "mean_seconds": 15.0}
+
+
+def health_problems(runs: list[dict], labels: list[str] | None = None) -> list[str]:
+    """Why these evaluation runs cannot be trusted to compare prompts; [] if they can."""
+    problems = []
+    for i, r in enumerate(runs):
+        name = labels[i] if labels else f"run {i + 1}"
+        for metric, limit in HEALTH_LIMITS.items():
+            value = r.get(metric)
+            if value is not None and value > limit:
+                problems.append(f"{name}: {metric} {value:g} (limit {limit:g})")
+    return problems
 
 
 @dataclass(frozen=True)
@@ -194,7 +214,9 @@ def _evaluate(cfg, prompt: LoadedPrompt, label: str, runs: int, backend: str, ca
         print(
             f"  pass {metrics['pass_rate']:.3f}  urgent recall {metrics['urgent_recall']:.3f}  "
             f"false alarms {metrics['false_alarm_rate']:.3f}  violations "
-            f"{metrics['violation_rate']:.3f}  mean {metrics['mean_seconds']:.1f}s"
+            f"{metrics['violation_rate']:.3f}  mean {metrics['mean_seconds']:.1f}s  "
+            f"tool errors {metrics.get('tool_errors', 0):g}  retries "
+            f"{metrics.get('tool_retries', 0):g}"
         )
         results.append(metrics)
     return results
@@ -228,6 +250,19 @@ def _promote(cfg: ProjectConfig, args) -> None:
     print("\nGate")
     for line in reasons:
         print(f"  {line}")
+    labels = [f"production run {i}" for i in range(1, len(prod_runs) + 1)]
+    labels += [f"candidate run {i}" for i in range(1, len(cand_runs) + 1)]
+    problems = health_problems(prod_runs + cand_runs, labels)
+    if problems:
+        print("\nPlatform health")
+        for line in problems:
+            print(f"  {line}")
+        print(
+            f"\nINCONCLUSIVE: kept version {current} as production. Tool lookups were failing "
+            "or slow, so these scores measure the platform, not the prompt. Run promote again "
+            "later (check speed first with one evaluation)."
+        )
+        return
     if not promote:
         print(f"\nKEPT version {current} as production: the candidate did not pass every check.")
         return

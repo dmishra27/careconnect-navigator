@@ -128,3 +128,20 @@ def test_rollback_swaps_production_and_previous(monkeypatch):
     monkeypatch.setattr(pr, "set_alias", lambda cfg, a, v: aliases.__setitem__(a, v))
     pr.main(["rollback"])
     assert aliases == {"production": "1", "previous": "2"}
+
+
+def test_healthy_runs_raise_no_problem():
+    healthy = {**_run(), "tool_errors": 0, "tool_retries": 1, "mean_seconds": 5.5}
+    assert pr.health_problems([healthy, healthy]) == []
+    assert pr.health_problems([_run()]) == []  # older runs without health metrics
+
+
+def test_failed_lookups_retries_or_slow_runs_make_the_gate_inconclusive():
+    # what 18 Oct looked like: tool errors, many retries, 47 s per question
+    spoilt = {**_run(0.862), "tool_errors": 4, "tool_retries": 9, "mean_seconds": 47.3}
+    problems = pr.health_problems([spoilt], ["production run 3"])
+    assert problems == [
+        "production run 3: tool_errors 4 (limit 0)",
+        "production run 3: tool_retries 9 (limit 2)",
+        "production run 3: mean_seconds 47.3 (limit 15)",
+    ]

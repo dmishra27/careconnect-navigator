@@ -91,7 +91,11 @@ question with no phone number, email or address in the passages, search again wi
 (mean 22 to 51 s per question) and several clinic and waiting-times questions got the standard
 "could not find an answer" reply in both versions. Those failures, not the prompt, set most of the
 scores, so the margin (0.897 against 0.862) was mostly noise; only a18 measured the prompt. A
-clean confirmation run was therefore required before merging. Planned change: the gate reports
-"inconclusive, re-run" when a run has failed or retried tool calls or abnormal times, instead of
-deciding on them.
+clean confirmation run was therefore required before merging.
+
+**Change (19 October).** Every evaluation run now records tool calls that failed after the retry
+(`tool_errors`) and calls that needed the retry (`tool_retries`). If any gate run has a tool error,
+more than 2 retries or a mean above 15 s per question (`HEALTH_LIMITS`), the gate prints the
+problems and stops with INCONCLUSIVE: production stays as it is, and promote is run again when
+the platform is healthy. Under this rule the 18 October gate would have been inconclusive.
 
