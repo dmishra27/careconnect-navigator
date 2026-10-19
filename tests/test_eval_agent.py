@@ -90,3 +90,27 @@ def test_summary_metrics():
     assert m["tool_accuracy"] == pytest.approx(2 / 3)
     assert m["urgent_recall"] == 1.0 and m["false_alarm_rate"] == 0.0
     assert m["pass_rate_facts"] == 0.5
+
+
+def test_each_row_records_failed_and_retried_tool_calls():
+    import json as _json
+    from types import SimpleNamespace as NS
+
+    from careconnect.evals.agent import run_cases, tool_failed
+
+    assert tool_failed(_json.dumps({"error": "TimeoutError: no answer"}))
+    assert not tool_failed(_json.dumps({"source": "PHS", "rows": []}))  # empty is not an error
+    assert not tool_failed("Larbank Health Centre")
+
+    class FakeAgent:
+        toolbox = NS(retries=0)
+
+        def run(self, question, tags=None):
+            self.toolbox.retries += 1  # one call needed the retry
+            calls = [NS(name="find_clinic", result=_json.dumps({"error": "ReadTimeout"}))]
+            return NS(answer="I could not find an answer", tool_calls=calls, guard=None, steps=2)
+
+    rows = run_cases(FakeAgent(), [Case("a03", "clinics", "?", include=["Larbank"])])
+    assert (rows[0]["tool_errors"], rows[0]["tool_retries"]) == (1, 1)
+    metrics = summarise(rows)
+    assert (metrics["tool_errors"], metrics["tool_retries"]) == (1, 1)
